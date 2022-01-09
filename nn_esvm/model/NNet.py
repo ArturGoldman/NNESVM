@@ -3,7 +3,7 @@ import torch.nn as nn
 
 
 class MLP(nn.Module):
-    def __init__(self, dim=2, hidden=10, blocks=3):
+    def __init__(self, dim=2, out_dim=1, hidden=10, blocks=3):
         super().__init__()
 
         self.head = nn.Sequential(
@@ -14,15 +14,14 @@ class MLP(nn.Module):
         mods = []
         for i in range(blocks-2):
             mods += [
-                nn.Linear(dim, hidden),
+                nn.Linear(hidden, hidden),
                 nn.LeakyReLU()
             ]
 
         self.body = nn.Sequential(*mods)
 
         self.tail = nn.Sequential(
-            nn.Linear(dim, hidden),
-            nn.LeakyReLU()
+            nn.Linear(hidden, out_dim)
         )
 
     def forward(self, x):

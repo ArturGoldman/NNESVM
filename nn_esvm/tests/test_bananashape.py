@@ -19,7 +19,7 @@ def check_potential():
     print(cur.potential(A))
 
 
-def check_grad():
+def check_log():
     cur = BananaShape(5)
     A = torch.arange(0, 15).reshape(3, 5).float()
     print(A)
@@ -27,8 +27,17 @@ def check_grad():
     print(cur.log_prob(A))
 
 
+def check_grad():
+    cur = BananaShape(5)
+    A = torch.arange(0, 15).reshape(3, 5).float()
+    print(A)
+    print(cur.potential(A))
+    print(cur.grad_log(A))
+
+
 if __name__ == "__main__":
     #plot_dist()
     #check_potential()
+    #check_log()
     check_grad()
 

@@ -16,8 +16,7 @@ class BananaShape(nn.Module):
         self.base_dist = D.MultivariateNormal(torch.zeros(dim), torch.diag(var))
 
     def potential(self, x):
-        x[:, 1] = x[:, 1] + self.b*x[:, 0]**2 - self.p*self.b
-        return x[:, 0]**2/(2*self.p) + x[:, 1]**2 + (x[:, 2:]**2/2).sum(dim=1)
+        return x[:, 0]**2/(2*self.p) + (x[:, 1] + self.b*x[:, 0]**2 - self.p*self.b)**2 + (x[:, 2:]**2/2).sum(dim=1)
 
     def sample(self, n):
         samples = self.base_dist.sample((n,))
@@ -28,6 +27,17 @@ class BananaShape(nn.Module):
         y = x
         y[:, 1] = y[:, 1] - self.b * y[:, 0] ** 2 + self.p * self.b
         return self.base_dist.log_prob(y)
+
+    def grad_log(self, x: torch.Tensor):
+        y = x.clone()
+        sec = 2*(x[:, 1]+self.b*x[:, 0]**2-self.p*self.b)
+        first = x[:, 0]/self.p + sec**2 * self.b * x[:, 0]
+        y[:, 0] = first
+        y[:, 1] = sec
+        return -y
+
+
+
 
 
 

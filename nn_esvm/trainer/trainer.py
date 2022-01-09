@@ -4,11 +4,16 @@ from tqdm import tqdm
 from nn_esvm.base import BaseTrainer
 from nn_esvm.utils import inf_loop, MetricTracker
 from nn_esvm.datasets.utils import get_dataloader
+from nn_esvm.MCMC import GenMCMC
 import nn_esvm.distributions
 import nn_esvm.functions_to_E
 import nn_esvm.loss
 import nn_esvm.datasets
 import matplotlib.pyplot as plt
+from torch.nn.utils import clip_grad_norm_
+from multiprocessing import Pool
+import multiprocessing
+import time
 
 
 class Trainer(BaseTrainer):
@@ -31,7 +36,7 @@ class Trainer(BaseTrainer):
         self.config = config
 
         self.criterion = config.init_obj(config["loss_spec"], nn_esvm.loss)
-        self.function = config.init_obj(config["f(x)"], nn_esvm.functions_to_E)
+        self.function = config.init_ftn("f(x)", nn_esvm.functions_to_E)
         self.target_distribution = config.init_obj(config["data"]["target_dist"],
                                                    nn_esvm.distributions)
         self.data_loader = get_dataloader(config, self.target_distribution, "train")
@@ -46,14 +51,25 @@ class Trainer(BaseTrainer):
 
         self.log_step = self.config["trainer"]["log_step"]
         self.val_step = self.config["trainer"]["val_step"]
+        self.cv_type = self.config["cv_type"]
 
         self.train_metrics = MetricTracker(
-            "ESV loss", "grad_norm",
+            "loss_esv", "grad_norm",
             writer=self.writer
         )
 
         self.trial_num = self.config["data"]["val"]["Trials"]
         self.baseline_box = None
+
+        self.val_desc = self.config["data"]["val"]["datasets"][0]["args"]
+        self.generator = GenMCMC(self.target_distribution.grad_log,
+                                 self.val_desc["mcmc_type"], self.val_desc["gamma"])
+
+    def _clip_grad_norm(self):
+        if self.config["trainer"].get("grad_norm_clip", None) is not None:
+            clip_grad_norm_(
+                self.model.parameters(), self.config["trainer"]["grad_norm_clip"]
+            )
 
     def _train_epoch(self, epoch):
         """
@@ -104,41 +120,82 @@ class Trainer(BaseTrainer):
 
         return log
 
-    def process_batch(self, batch, metrics: MetricTracker):
-        batch.to(self.device)
-        outputs = self.model(batch)
+    def process_cv(self, batch, cr_gr=False, mode="simple_additive"):
+        if mode == "simple_additive":
+            return self.model(batch)
+        elif mode == "stein":
+            laplacians = []
+            grads = []
+            for x in tqdm(batch):
+                out = self.model(x)
+                grad = torch.autograd.grad(out, x, create_graph=cr_gr)
+                grads.append(grad[0])
+
+                hess = torch.autograd.functional.hessian(self.model, x, create_graph=cr_gr)
+                laplacians.append(torch.trace(hess))
+            log_grads = self.target_distribution.grad_log(batch)
+            return torch.stack(laplacians) + (log_grads*torch.stack(grads, dim=0)).sum(dim=1)
+        else:
+            raise ValueError("Unrecognised CV type")
+
+    def process_batch(self, batch: torch.Tensor, metrics: MetricTracker):
+        batch = batch.to(self.device)
+        self.optimizer.zero_grad()
+        batch.requires_grad = True
+        outputs = self.process_cv(batch, cr_gr=True, mode=self.cv_type)
 
         loss_esv = self.criterion(self.function(batch)-outputs)
         loss_esv.backward()
-
+        self._clip_grad_norm()
         self.optimizer.step()
 
         metrics.update("loss_esv", loss_esv.item())
 
         return loss_esv.item()
 
+    def generate_parallel_chains(self, T):
+        rseed = 926
+        nbcores = multiprocessing.cpu_count()
+        print("Total cores for multiprocessing", nbcores)
+        multi = Pool(nbcores)
+        #starting_points = torch.randn((T, self.target_distribution.dim))
+        res = multi.starmap(self.generator.gen_samples,
+                            [(self.val_desc["n_burn"]+self.val_desc["n_clean"],
+                              self.target_distribution.dim,
+                              rseed + i) for i in range(T)])
+        return res
+
     def calc_box(self, description, to_cv=False):
         # TODO: mean estimation is unstable
         cur_box = []
         vnfs = []
         vnfcvs = []
+        print("Parallel chain generation started")
+        st_time = time.time()
+        chains = self.generate_parallel_chains(self.trial_num)
+        fin_time = time.time()
+        print(self.trial_num, "chains generated in", fin_time-st_time, "seconds")
+        chains = torch.stack(chains, dim=0)
+        chains = chains[:, self.val_desc["n_burn"]:, :]
+
         for T in tqdm(range(self.trial_num), desc=description):
-            new_dataset = self.config.init_obj(self.config["data"]["val"]["datasets"][0],
-                                               nn_esvm.datasets, dist=self.target_distribution)
-
-            vnf = self.criterion(self.function(new_dataset.chain))
-            batch = new_dataset.chain.to(self.device)
-            cvs = self.model(batch)
-            vnfcv = self.criterion(self.function(new_dataset.chain)-cvs)
+            batch = chains[T].to(self.device)
+            batch.requires_grad = True
             if to_cv:
-                cur_box.append((self.function(new_dataset.chain)-cvs).mean().item())
+                vnf = self.criterion(self.function(chains[T]))
+                cvs = self.process_cv(batch, False, self.cv_type)
+                vnfcv = self.criterion(self.function(batch) - cvs)
+                cur_box.append((self.function(batch)-cvs).mean().item())
+
+                vnfs.append(vnf.item())
+                vnfcvs.append(vnfcv.item())
+
             else:
-                cur_box.append(self.function(new_dataset.chain).mean().item())
+                cur_box.append(self.function(batch).mean().item())
 
-            vnfs.append(vnf.item())
-            vnfcvs.append(vnfcv.item())
-
-        return cur_box, sum(vnfs)/len(vnfs), sum(vnfcvs)/len(vnfcvs)
+        if len(vnfs) == 0:
+            return cur_box, None, None
+        return cur_box, sum(vnfs) / len(vnfs), sum(vnfcvs) / len(vnfcvs)
 
     def _valid_example(self):
         """
@@ -146,17 +203,16 @@ class Trainer(BaseTrainer):
         """
         self.model.eval()
 
-        with torch.no_grad():
-            if self.baseline_box is None:
-                self.baseline_box, _, _ = self.calc_box("Calculating baseline")
+        if self.baseline_box is None:
+            self.baseline_box, _, _ = self.calc_box("Calculating baseline")
 
-            cur_box, vnf, vnfcv = self.calc_box("Validating", to_cv=True)
+        cur_box, vnf, vnfcv = self.calc_box("Validating", to_cv=True)
 
-            self.writer.add_scalar("V_n(f)", vnf)
-            self.writer.add_scalar("V_n(f-g)", vnfcv)
-            self.writer.add_scalar("V_n(f)/V_n(f-g)", vnf/vnfcv)
+        self.writer.add_scalar("V_n(f)", vnf)
+        self.writer.add_scalar("V_n(f-g)", vnfcv)
+        self.writer.add_scalar("V_n(f) over V_n(f-g)", vnf/vnfcv)
 
-            self._log_boxplots([self.baseline_box, cur_box], ["Vanila", "ESVM"])
+        self._log_boxplots([self.baseline_box, cur_box], ["Vanila", "ESVM"])
 
     def _progress(self, batch_idx):
         base = "[{}/{} ({:.0f}%)]"
@@ -171,8 +227,10 @@ class Trainer(BaseTrainer):
     def _log_boxplots(self, boxes, names):
         plt.figure(figsize=(12, 8))
         plt.boxplot(boxes, showfliers=False, labels=names)
+        plt.title("BananaShape")
         plt.grid()
-        self.writer.add_plot("Boxplots", plt)
+        self.writer.add_image("Boxplots", plt)
+        self.writer.add_plot("Boxplots_plotty", plt)
 
     @staticmethod
     @torch.no_grad()

@@ -26,9 +26,9 @@ class LossESVM(nn.Module):
 
         avg = batch.mean(dim=0)
         n = batch.size(0)
-        loss = (batch-avg)**2 / n
+        loss = ((batch-avg)**2).sum() / n
         for s in range(1, self.bn):
-            loss += 2 * self.lagf(s)*(batch[:-s]-avg)*(batch[s:]-avg)/n
+            loss += 2 * self.lagf(s/self.bn)*((batch[:-s]-avg)*(batch[s:]-avg)).sum()/n
         return loss
 
 

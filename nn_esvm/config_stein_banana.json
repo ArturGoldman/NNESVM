@@ -1,12 +1,12 @@
 {
-  "name": "default_config",
+  "name": "baseline_banana_stein",
   "n_gpu": 1,
   "f(x)": {
     "type": "sec_coord",
     "args": {
     }
   },
-  "cv_type": "simple_additive",
+  "cv_type": "stein",
   "arch": {
     "type": "MLP",
     "args": {
@@ -26,7 +26,7 @@
       }
     },
     "train": {
-      "batch_size": 1000000,
+      "batch_size": 10000,
       "num_workers": 2,
       "datasets": [
         {
@@ -34,8 +34,8 @@
           "args": {
             "mcmc_type": "ULA",
             "gamma": 0.01,
-            "n_burn": 100000,
-            "n_clean": 1000000
+            "n_burn": 10000,
+            "n_clean": 10000
           }
         }
       ]
@@ -51,7 +51,7 @@
             "mcmc_type": "ULA",
             "gamma": 0.01,
             "n_burn": 10000,
-            "n_clean": 100000
+            "n_clean": 10000
           }
         }
       ]
@@ -89,6 +89,6 @@
     "wandb_project": "NeuralESVM-HSE-HDI",
     "log_step": 5,
     "val_step": 10,
-    "grad_norm_clip": 100
+    "grad_norm_clip": 200
   }
 }

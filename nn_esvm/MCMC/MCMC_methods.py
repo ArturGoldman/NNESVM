@@ -19,12 +19,14 @@ class GenMCMC(nn.Module):
             "ULA": ula_step,
         }
 
-    def gen_samples(self, n_samples, dim):
-        prev_point = torch.randn(dim)
+    def gen_samples(self, n_samples, dim, rseed=None):
+        if rseed is not None:
+            torch.manual_seed(rseed)
+        prev_point = torch.randn(dim).reshape(1, -1)
         samples = [prev_point]
-        for i in tqdm(range(n_samples), desc="Generating MC"):
+        for i in tqdm(range(n_samples), desc="Generating samples"):
             new_point = self.mapping[self.mcmc_type](prev_point, self.grad_log, self.gamma)
             samples.append(new_point)
             prev_point = new_point
-        return torch.stack(samples, dim=0)
+        return torch.cat(samples, dim=0)
 
