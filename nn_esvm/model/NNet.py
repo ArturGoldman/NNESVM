@@ -5,6 +5,8 @@ import torch.nn as nn
 class MLP(nn.Module):
     def __init__(self, dim=2, out_dim=1, hidden=10, blocks=3):
         super().__init__()
+        # TODO:positional encoding for lower dimensions
+        # is positional encoding needed though? i believe CV should be pretty smooth
 
         self.head = nn.Sequential(
             nn.Linear(dim, hidden),

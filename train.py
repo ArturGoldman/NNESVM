@@ -1,7 +1,6 @@
 import argparse
 import collections
 import warnings
-import itertools
 
 import numpy as np
 import torch

@@ -3,6 +3,13 @@ import torch.nn as nn
 import torch.distributions as D
 
 
+"""
+Each distribution class must have:
+dim field: int, dimensionality of data
+grad_log function: function which computes gradient of log density
+"""
+
+
 class BananaShape(nn.Module):
     def __init__(self, dim, p=100, b=0.1):
         super().__init__()
@@ -36,6 +43,35 @@ class BananaShape(nn.Module):
         y[:, 1] = sec
         return -y
 
+
+class GMM(nn.Module):
+    def __init__(self, dim, mu, sigma="I", rho=0.5):
+        super().__init__()
+        self.dim = dim
+        cov_mat = torch.eye(dim)
+        mu_mat = torch.ones((2, dim))*mu
+        mu_mat[1, :] = -mu_mat[1, :]
+        cov_mat = torch.tile(cov_mat.unsqueeze(0), (2, 1, 1))
+        mix = D.Categorical(torch.tensor([rho, 1-rho]))
+        comp = D.MultivariateNormal(
+            mu_mat, cov_mat)
+        self.gmm = D.MixtureSameFamily(mix, comp)
+
+    def log_prob(self, x):
+        return self.gmm.log_prob(x)
+
+    def grad_log(self, x: torch.Tensor):
+        grads = []
+        x.requires_grad = True
+        for val in x:
+            out = self.log_prob(val)
+            grad = torch.autograd.grad(out, val)
+            grads.append(grad[0])
+        x.requires_grad = False
+        return torch.stack(grads, dim=0)
+
+    def sample(self, n):
+        return self.gmm.sample((n,))
 
 
 

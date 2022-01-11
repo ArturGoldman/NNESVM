@@ -1,1 +1,1 @@
-from .BananaShape import BananaShape
+from .distributions import BananaShape, GMM

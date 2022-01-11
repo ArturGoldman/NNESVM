@@ -5,13 +5,13 @@ from nn_esvm.base import BaseTrainer
 from nn_esvm.utils import inf_loop, MetricTracker
 from nn_esvm.datasets.utils import get_dataloader
 from nn_esvm.MCMC import GenMCMC
+from nn_esvm.CV import process_cv
 import nn_esvm.distributions
 import nn_esvm.functions_to_E
 import nn_esvm.loss
 import nn_esvm.datasets
 import matplotlib.pyplot as plt
 from torch.nn.utils import clip_grad_norm_
-from multiprocessing import Pool
 import multiprocessing
 import time
 
@@ -36,6 +36,7 @@ class Trainer(BaseTrainer):
         self.config = config
 
         self.criterion = config.init_obj(config["loss_spec"], nn_esvm.loss)
+        self.metric = config.init_obj(config["metric"], nn_esvm.loss)
         self.function = config.init_ftn("f(x)", nn_esvm.functions_to_E)
         self.target_distribution = config.init_obj(config["data"]["target_dist"],
                                                    nn_esvm.distributions)
@@ -52,6 +53,7 @@ class Trainer(BaseTrainer):
         self.log_step = self.config["trainer"]["log_step"]
         self.val_step = self.config["trainer"]["val_step"]
         self.cv_type = self.config["cv_type"]
+        self.out_model_dim = self.config["arch"]["args"]["out_dim"]
 
         self.train_metrics = MetricTracker(
             "loss_esv", "grad_norm",
@@ -62,8 +64,8 @@ class Trainer(BaseTrainer):
         self.baseline_box = None
 
         self.val_desc = self.config["data"]["val"]["datasets"][0]["args"]
-        self.generator = GenMCMC(self.target_distribution.grad_log,
-                                 self.val_desc["mcmc_type"], self.val_desc["gamma"])
+        self.val_generator = GenMCMC(self.target_distribution.grad_log,
+                                     self.val_desc["mcmc_type"], self.val_desc["gamma"])
 
     def _clip_grad_norm(self):
         if self.config["trainer"].get("grad_norm_clip", None) is not None:
@@ -120,32 +122,45 @@ class Trainer(BaseTrainer):
 
         return log
 
-    def process_cv(self, batch, cr_gr=False, mode="simple_additive"):
+    """
+    def process_cv(self, batch, cr_gr=False, mode="simple_additive", operating_device="self"):
+        if operating_device == "self":
+            operating_device = self.device
         if mode == "simple_additive":
+            if self.out_model_dim != 1:
+                # model output dim should be 1 to be subtracted from f
+                raise ValueError("Model output dimension is not 1")
             return self.model(batch)
         elif mode == "stein":
+            if self.out_model_dim != self.target_distribution.dim:
+                raise ValueError("Model output dimension is not equal to distribution dimension")
             laplacians = []
-            grads = []
+            batch.requires_grad = True
             for x in tqdm(batch):
-                out = self.model(x)
-                grad = torch.autograd.grad(out, x, create_graph=cr_gr)
-                grads.append(grad[0])
+                jacob = torch.autograd.functional.jacobian(self.model, x, create_graph=cr_gr, vectorize=True)
+                laplacians.append(torch.trace(jacob))
 
-                hess = torch.autograd.functional.hessian(self.model, x, create_graph=cr_gr)
-                laplacians.append(torch.trace(hess))
-            log_grads = self.target_distribution.grad_log(batch)
-            return torch.stack(laplacians) + (log_grads*torch.stack(grads, dim=0)).sum(dim=1)
+            batch.requires_grad = False
+            batch = batch.to('cpu')
+            log_grads = self.target_distribution.grad_log(batch).to(operating_device)
+            batch = batch.to(operating_device)
+
+            outs = self.model(batch)
+            return torch.stack(laplacians) + (log_grads*outs).sum(dim=1)
         else:
             raise ValueError("Unrecognised CV type")
+    """
 
     def process_batch(self, batch: torch.Tensor, metrics: MetricTracker):
         batch = batch.to(self.device)
         self.optimizer.zero_grad()
-        batch.requires_grad = True
-        outputs = self.process_cv(batch, cr_gr=True, mode=self.cv_type)
-
+        outputs = process_cv(self.model, batch, self.device, self.out_model_dim,
+                             self.target_distribution.dim, self.target_distribution.grad_log,
+                             cr_gr=True, mode=self.cv_type)
         loss_esv = self.criterion(self.function(batch)-outputs)
-        loss_esv.backward()
+        # smart loss does backward itself
+        if "Smart" not in self.config["loss_spec"]["type"]:
+            loss_esv.backward()
         self._clip_grad_norm()
         self.optimizer.step()
 
@@ -153,38 +168,19 @@ class Trainer(BaseTrainer):
 
         return loss_esv.item()
 
-    def generate_parallel_chains(self, T):
-        rseed = 926
-        nbcores = multiprocessing.cpu_count()
-        print("Total cores for multiprocessing", nbcores)
-        multi = Pool(nbcores)
-        #starting_points = torch.randn((T, self.target_distribution.dim))
-        res = multi.starmap(self.generator.gen_samples,
-                            [(self.val_desc["n_burn"]+self.val_desc["n_clean"],
-                              self.target_distribution.dim,
-                              rseed + i) for i in range(T)])
-        return res
+    @staticmethod
+    def box_only(func, chain):
+        return func(chain)
 
     def calc_box(self, description, to_cv=False):
-        # TODO: mean estimation is unstable
-        cur_box = []
-        vnfs = []
-        vnfcvs = []
-        print("Parallel chain generation started")
-        st_time = time.time()
-        chains = self.generate_parallel_chains(self.trial_num)
-        fin_time = time.time()
-        print(self.trial_num, "chains generated in", fin_time-st_time, "seconds")
-        chains = torch.stack(chains, dim=0)
-        chains = chains[:, self.val_desc["n_burn"]:, :]
-
+        """
         for T in tqdm(range(self.trial_num), desc=description):
             batch = chains[T].to(self.device)
             batch.requires_grad = True
             if to_cv:
-                vnf = self.criterion(self.function(chains[T]))
+                vnf = self.metric(self.function(chains[T]))
                 cvs = self.process_cv(batch, False, self.cv_type)
-                vnfcv = self.criterion(self.function(batch) - cvs)
+                vnfcv = self.metric(self.function(batch) - cvs)
                 cur_box.append((self.function(batch)-cvs).mean().item())
 
                 vnfs.append(vnf.item())
@@ -196,6 +192,53 @@ class Trainer(BaseTrainer):
         if len(vnfs) == 0:
             return cur_box, None, None
         return cur_box, sum(vnfs) / len(vnfs), sum(vnfcvs) / len(vnfcvs)
+        """
+
+        print("~~~~~~", description, "~~~~~~")
+        print("Parallel chain generation started")
+        st_time = time.time()
+        chains = self.val_generator.generate_parallel_chains(self.val_desc["n_burn"]+self.val_desc["n_clean"],
+                                                             self.target_distribution.dim, self.trial_num)
+        fin_time = time.time()
+        print(self.trial_num, "chains generated in", fin_time-st_time, "seconds")
+        chains = torch.stack(chains, dim=0)
+        chains = chains[:, self.val_desc["n_burn"]:, :]
+
+        nbcores = multiprocessing.cpu_count()
+        ctx = torch.multiprocessing.get_context('spawn')
+        print("Total cores for multiprocessing", nbcores)
+        multi = ctx.Pool(nbcores)
+
+        print("Parallel f(chain) calculation started")
+        f_chains = multi.starmap(self.box_only,
+                                 [(self.function, chains[i]) for i in range(self.trial_num)])
+        f_chains = torch.stack(f_chains, dim=0)
+        print("Parallel f(chain) calculation finished")
+        if to_cv:
+            print("Parallel vnfs calculation started")
+            multi = ctx.Pool(nbcores)
+            vnfs = multi.map(self.metric,
+                             [f_chains[i] for i in range(self.trial_num)])
+            vnfs = torch.stack(vnfs, dim=0)
+            print("Parallel cvs calculation started")
+            self.model = self.model.to('cpu')
+            multi = ctx.Pool(nbcores)
+            cvs = multi.starmap(process_cv,
+                                [(self.model, chains[i], 'cpu',
+                                  self.out_model_dim, self.target_distribution.dim,
+                                  self.target_distribution.grad_log,
+                                  False, self.cv_type, True) for i in range(self.trial_num)])
+            self.model = self.model.to(self.device)
+            cvs = torch.stack(cvs, dim=0).unsqueeze(-1)
+            print("Parallel vnfcvs calculation started")
+            multi = ctx.Pool(nbcores)
+            vnfcvs = multi.map(self.metric,
+                               [f_chains[i]-cvs[i] for i in range(self.trial_num)])
+            vnfcvs = torch.stack(vnfcvs, dim=0)
+            print("Evaluations finished")
+            return (f_chains-cvs).mean(dim=(-1, -2)), vnfs.mean(), vnfcvs.mean()
+        else:
+            return f_chains.mean(dim=(-1, -2)), None, None
 
     def _valid_example(self):
         """
@@ -227,7 +270,6 @@ class Trainer(BaseTrainer):
     def _log_boxplots(self, boxes, names):
         plt.figure(figsize=(12, 8))
         plt.boxplot(boxes, showfliers=False, labels=names)
-        plt.title("BananaShape")
         plt.grid()
         self.writer.add_image("Boxplots", plt)
         self.writer.add_plot("Boxplots_plotty", plt)
