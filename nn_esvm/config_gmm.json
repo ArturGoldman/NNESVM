@@ -12,8 +12,10 @@
     "args": {
       "dim": 2,
       "out_dim": 2,
-      "hidden": 10,
-      "blocks": 3
+      "pos_encoding_dim": 0,
+      "hidden": 50,
+      "blocks": 3,
+      "activation": "ReLU"
     }
   },
   "data": {
@@ -21,29 +23,31 @@
       "type": "GMM",
       "args": {
         "dim": 2,
-        "mu": 0.5,
+        "mu": 1,
         "sigma": "I",
         "rho": 0.5
       }
     },
     "train": {
-      "batch_size": 10000,
+      "batch_size": 1000,
       "num_workers": 2,
+      "shuffle": true,
       "datasets": [
         {
           "type": "DistributionDataset",
           "args": {
             "mcmc_type": "ULA",
             "gamma": 0.1,
-            "n_burn": 10000,
-            "n_clean": 10000
+            "n_burn": 3000,
+            "n_clean": 1000
           }
         }
       ]
     },
     "val": {
-      "batch_size": 100000,
+      "batch_size": 1000,
       "num_workers": 2,
+      "shuffle": false,
       "Trials": 100,
       "datasets": [
         {
@@ -51,8 +55,8 @@
           "args": {
             "mcmc_type": "ULA",
             "gamma": 0.1,
-            "n_burn": 10000,
-            "n_clean": 10000
+            "n_burn": 3000,
+            "n_clean": 1000
           }
         }
       ]
@@ -61,7 +65,7 @@
   "optimizer": {
     "type": "SGD",
     "args": {
-      "lr": 2e-4,
+      "lr": 2e-2,
       "momentum": 0.1,
       "weight_decay": 0.1
     }
@@ -83,20 +87,20 @@
   "lr_scheduler": {
     "type": "ExponentialLR",
     "args": {
-      "gamma": 0.999
+      "gamma": 0.98
     }
   },
   "trainer": {
-    "epochs": 20,
+    "epochs": 15,
     "save_dir": "saved/",
     "save_period": 10,
     "verbosity": 2,
     "monitor": "min loss_esv",
-    "early_stop": 25,
+    "early_stop": 30,
     "visualize": "wandb",
     "wandb_project": "NeuralESVM-HSE-HDI",
     "log_step": 5,
     "val_step": 5,
-    "grad_norm_clip": 200
+    "grad_norm_clip": 1
   }
 }

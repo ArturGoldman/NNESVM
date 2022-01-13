@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 from torch.nn.utils import clip_grad_norm_
 import multiprocessing
 import time
+import pandas as pd
 
 
 class Trainer(BaseTrainer):
@@ -40,7 +41,7 @@ class Trainer(BaseTrainer):
         self.function = config.init_ftn("f(x)", nn_esvm.functions_to_E)
         self.target_distribution = config.init_obj(config["data"]["target_dist"],
                                                    nn_esvm.distributions)
-        self.data_loader = get_dataloader(config, self.target_distribution, "train")
+        self.data_loader = get_dataloader(config, self.target_distribution, "train", self.writer)
 
         if len_epoch is None:
             # epoch-based training
@@ -122,48 +123,18 @@ class Trainer(BaseTrainer):
 
         return log
 
-    """
-    def process_cv(self, batch, cr_gr=False, mode="simple_additive", operating_device="self"):
-        if operating_device == "self":
-            operating_device = self.device
-        if mode == "simple_additive":
-            if self.out_model_dim != 1:
-                # model output dim should be 1 to be subtracted from f
-                raise ValueError("Model output dimension is not 1")
-            return self.model(batch)
-        elif mode == "stein":
-            if self.out_model_dim != self.target_distribution.dim:
-                raise ValueError("Model output dimension is not equal to distribution dimension")
-            laplacians = []
-            batch.requires_grad = True
-            for x in tqdm(batch):
-                jacob = torch.autograd.functional.jacobian(self.model, x, create_graph=cr_gr, vectorize=True)
-                laplacians.append(torch.trace(jacob))
-
-            batch.requires_grad = False
-            batch = batch.to('cpu')
-            log_grads = self.target_distribution.grad_log(batch).to(operating_device)
-            batch = batch.to(operating_device)
-
-            outs = self.model(batch)
-            return torch.stack(laplacians) + (log_grads*outs).sum(dim=1)
-        else:
-            raise ValueError("Unrecognised CV type")
-    """
-
     def process_batch(self, batch: torch.Tensor, metrics: MetricTracker):
         batch = batch.to(self.device)
         self.optimizer.zero_grad()
         outputs = process_cv(self.model, batch, self.device, self.out_model_dim,
                              self.target_distribution.dim, self.target_distribution.grad_log,
-                             cr_gr=True, mode=self.cv_type)
-        loss_esv = self.criterion(self.function(batch)-outputs)
+                             cr_gr=True, mode=self.cv_type).reshape(-1, 1)
+        loss_esv = self.criterion(self.function(batch), outputs)
         # smart loss does backward itself
         if "Smart" not in self.config["loss_spec"]["type"]:
             loss_esv.backward()
         self._clip_grad_norm()
         self.optimizer.step()
-
         metrics.update("loss_esv", loss_esv.item())
 
         return loss_esv.item()
@@ -217,8 +188,8 @@ class Trainer(BaseTrainer):
         if to_cv:
             print("Parallel vnfs calculation started")
             multi = ctx.Pool(nbcores)
-            vnfs = multi.map(self.metric,
-                             [f_chains[i] for i in range(self.trial_num)])
+            vnfs = multi.starmap(self.metric,
+                             [(f_chains[i], None) for i in range(self.trial_num)])
             vnfs = torch.stack(vnfs, dim=0)
             print("Parallel cvs calculation started")
             self.model = self.model.to('cpu')
@@ -232,8 +203,8 @@ class Trainer(BaseTrainer):
             cvs = torch.stack(cvs, dim=0).unsqueeze(-1)
             print("Parallel vnfcvs calculation started")
             multi = ctx.Pool(nbcores)
-            vnfcvs = multi.map(self.metric,
-                               [f_chains[i]-cvs[i] for i in range(self.trial_num)])
+            vnfcvs = multi.starmap(self.metric,
+                               [(f_chains[i], cvs[i]) for i in range(self.trial_num)])
             vnfcvs = torch.stack(vnfcvs, dim=0)
             print("Evaluations finished")
             return (f_chains-cvs).mean(dim=(-1, -2)), vnfs.mean(), vnfcvs.mean()
@@ -254,6 +225,14 @@ class Trainer(BaseTrainer):
         self.writer.add_scalar("V_n(f)", vnf)
         self.writer.add_scalar("V_n(f-g)", vnfcv)
         self.writer.add_scalar("V_n(f) over V_n(f-g)", vnf/vnfcv)
+        self.writer.add_text("Var of means in boxplot (including outliers)",
+                             "Baseline var: {}, current var: {}".format(torch.var(self.baseline_box),
+                                                                        torch.var(cur_box)))
+        srt_b, _ = torch.sort(self.baseline_box)
+        srt_c, _ = torch.sort(cur_box)
+        df = pd.DataFrame({"f": srt_b.tolist(),
+                           "f-g": srt_c.tolist()})
+        self.writer.add_table("num_boxes", df)
 
         self._log_boxplots([self.baseline_box, cur_box], ["Vanila", "ESVM"])
 

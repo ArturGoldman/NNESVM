@@ -48,7 +48,10 @@ class GMM(nn.Module):
     def __init__(self, dim, mu, sigma="I", rho=0.5):
         super().__init__()
         self.dim = dim
-        cov_mat = torch.eye(dim)
+        if sigma == "I":
+            cov_mat = torch.eye(dim)
+        else:
+            raise ValueError("Cov matrix type not recognised")
         mu_mat = torch.ones((2, dim))*mu
         mu_mat[1, :] = -mu_mat[1, :]
         cov_mat = torch.tile(cov_mat.unsqueeze(0), (2, 1, 1))
@@ -72,8 +75,3 @@ class GMM(nn.Module):
 
     def sample(self, n):
         return self.gmm.sample((n,))
-
-
-
-
-

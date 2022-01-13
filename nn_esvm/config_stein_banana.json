@@ -1,5 +1,5 @@
 {
-  "name": "baseline_banana_stein",
+  "name": "banana_stein",
   "n_gpu": 1,
   "f(x)": {
     "type": "sec_coord",
@@ -10,23 +10,24 @@
   "arch": {
     "type": "MLP",
     "args": {
-      "dim": 2,
-      "out_dim": 2,
-      "hidden": 10,
-      "blocks": 3
+      "dim": 8,
+      "out_dim": 8,
+      "hidden": 50,
+      "blocks": 3,
+      "activation": "ReLU"
     }
   },
   "data": {
     "target_dist": {
       "type": "BananaShape",
       "args": {
-        "dim": 2,
+        "dim": 8,
         "p": 100,
         "b": 0.1
       }
     },
     "train": {
-      "batch_size": 10000,
+      "batch_size": 5000,
       "num_workers": 2,
       "datasets": [
         {
@@ -35,13 +36,13 @@
             "mcmc_type": "ULA",
             "gamma": 0.01,
             "n_burn": 10000,
-            "n_clean": 10000
+            "n_clean": 5000
           }
         }
       ]
     },
     "val": {
-      "batch_size": 100000,
+      "batch_size": 5000,
       "num_workers": 2,
       "Trials": 100,
       "datasets": [
@@ -50,8 +51,8 @@
           "args": {
             "mcmc_type": "ULA",
             "gamma": 0.01,
-            "n_burn": 100000,
-            "n_clean": 10000
+            "n_burn": 10000,
+            "n_clean": 5000
           }
         }
       ]
@@ -60,12 +61,19 @@
   "optimizer": {
     "type": "SGD",
     "args": {
-      "lr": 2e-4,
+      "lr": 2e-2,
       "momentum": 0.1,
       "weight_decay": 0.1
     }
   },
   "loss_spec": {
+    "type": "SmartLossESVM",
+    "args": {
+      "lag_func": "linear",
+      "bn": 300
+    }
+  },
+  "metric": {
     "type": "LossESVM",
     "args": {
       "lag_func": "linear",
@@ -79,16 +87,16 @@
     }
   },
   "trainer": {
-    "epochs": 20,
+    "epochs": 10,
     "save_dir": "saved/",
     "save_period": 10,
     "verbosity": 2,
     "monitor": "min loss_esv",
     "early_stop": 25,
-    "visualize": "tensorboard",
+    "visualize": "wandb",
     "wandb_project": "NeuralESVM-HSE-HDI",
     "log_step": 5,
-    "val_step": 10,
+    "val_step": 5,
     "grad_norm_clip": 200
   }
 }

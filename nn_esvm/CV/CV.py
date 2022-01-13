@@ -17,7 +17,8 @@ def process_cv(model, batch, operating_device,
         laplacians = []
         batch.requires_grad = True
         for x in tqdm(batch, desc="Processing stein CV"):
-            jacob = torch.autograd.functional.jacobian(model, x, create_graph=cr_gr, vectorize=True)
+            jacob = torch.autograd.functional.jacobian(model, x.reshape(1, -1),
+                                                       create_graph=cr_gr, vectorize=True).squeeze()
             if to_detach:
                 laplacians.append(torch.trace(jacob).detach())
             else:

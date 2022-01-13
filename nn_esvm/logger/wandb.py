@@ -87,6 +87,11 @@ class WanDBWriter:
             self.scalar_name(scalar_name): hist
         }, step=self.step)
 
+    def add_table(self, scalar_name, df):
+        self.wandb.log({
+            self.scalar_name(scalar_name): self.wandb.Table(data=df)
+        }, step=self.step)
+
     def add_images(self, scalar_name, images):
         raise NotImplementedError()
 

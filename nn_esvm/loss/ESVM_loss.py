@@ -20,15 +20,20 @@ class LossESVM(nn.Module):
             raise RuntimeError('Passed lag function was not recognised')
         self.bn = bn
 
-    def __call__(self, batch: Tensor):
+    def __call__(self, fbatch: Tensor, cvbatch: Tensor):
         """
         batch: [n_batch, dim]. Expected to receive points h(X) already
         :return: Empirical Spectral Variance, tensor
         """
+        batch = fbatch
+        if cvbatch is not None:
+            batch = batch - cvbatch
 
         avg = batch.mean(dim=0)
+
         n = batch.size(0)
         loss = ((batch-avg)**2).sum() / n
+        # loss = (batch**2).sum() / n
         for s in range(1, self.bn):
             loss += 2 * self.lagf(s/self.bn)*((batch[:-s]-avg)*(batch[s:]-avg)).sum()/n
         return loss
@@ -38,16 +43,19 @@ class SmartLossESVM(LossESVM):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def __call__(self, batch: Tensor):
+    def __call__(self, fbatch: Tensor, cvbatch: Tensor):
         """
         batch: [n_batch, dim]. Expected to receive points h(X) already
         :return: Empirical Spectral Variance, tensor(!!!)
         """
 
+        batch = fbatch-cvbatch
+
         avg = batch.mean(dim=0)
+
         n = batch.size(0)
         loss_accum = 0
-        loss = ((batch-avg)**2).sum() / n
+        loss = ((batch-avg)**2).sum()/n
         loss_accum += loss.item()
         loss.backward(retain_graph=True)
         for s in tqdm(range(1, self.bn), desc="Calculating loss"):
@@ -55,3 +63,19 @@ class SmartLossESVM(LossESVM):
             loss_accum += loss.item()
             loss.backward(retain_graph=True)
         return torch.tensor(loss_accum)
+
+
+    @staticmethod
+    @torch.no_grad()
+    def get_grad_norm(model, norm_type=2):
+        parameters = model.parameters()
+        if isinstance(parameters, torch.Tensor):
+            parameters = [parameters]
+        parameters = [p for p in parameters if p.grad is not None]
+        total_norm = torch.norm(
+            torch.stack(
+                [torch.norm(p.grad.detach(), norm_type).cpu() for p in parameters]
+            ),
+            norm_type,
+        )
+        return total_norm.item()
