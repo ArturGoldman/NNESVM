@@ -12,13 +12,14 @@ class LossESVM(nn.Module):
             return -2*abs(s)+2
         return 1
 
-    def __init__(self, lag_func="linear", bn=50):
+    def __init__(self, lag_func="linear", bn=50, reg_lambda=0.):
         super().__init__()
         if lag_func == "linear":
             self.lagf = self.linear_w
         else:
             raise RuntimeError('Passed lag function was not recognised')
         self.bn = bn
+        self.lam = reg_lambda
 
     def __call__(self, fbatch: Tensor, cvbatch: Tensor):
         """
@@ -36,6 +37,9 @@ class LossESVM(nn.Module):
         # loss = (batch**2).sum() / n
         for s in range(1, self.bn):
             loss += 2 * self.lagf(s/self.bn)*((batch[:-s]-avg)*(batch[s:]-avg)).sum()/n
+        # note that we added reg to loss, though it should not appear in metric
+        # if cvbatch is not None:
+        #     loss += self.lam*(cvbatch**2).mean()
         return loss
 
 
@@ -62,6 +66,9 @@ class SmartLossESVM(LossESVM):
             loss = 2 * self.lagf(s/self.bn)*((batch[:-s]-avg)*(batch[s:]-avg)).sum()/n
             loss_accum += loss.item()
             loss.backward(retain_graph=True)
+        loss = self.lam*(cvbatch**2).mean()
+        loss_accum += loss.item()
+        loss.backward()
         return torch.tensor(loss_accum)
 
 

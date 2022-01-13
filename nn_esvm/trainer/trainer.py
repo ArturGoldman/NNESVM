@@ -225,9 +225,10 @@ class Trainer(BaseTrainer):
         self.writer.add_scalar("V_n(f)", vnf)
         self.writer.add_scalar("V_n(f-g)", vnfcv)
         self.writer.add_scalar("V_n(f) over V_n(f-g)", vnf/vnfcv)
+        base_v = torch.var(self.baseline_box)
+        base_c = torch.var(cur_box)
         self.writer.add_text("Var of means in boxplot (including outliers)",
-                             "Baseline var: {}, current var: {}".format(torch.var(self.baseline_box),
-                                                                        torch.var(cur_box)))
+                             "Baseline var: {}, current var: {}, current/baseline:{}".format(base_v, base_c, base_v/base_c))
         srt_b, _ = torch.sort(self.baseline_box)
         srt_c, _ = torch.sort(cur_box)
         df = pd.DataFrame({"f": srt_b.tolist(),

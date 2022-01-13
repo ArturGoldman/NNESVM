@@ -15,7 +15,7 @@
       "pos_encoding_dim": 0,
       "hidden": 50,
       "blocks": 3,
-      "activation": "ReLU"
+      "activation": "LeakyReLU"
     }
   },
   "data": {
@@ -31,14 +31,14 @@
     "train": {
       "batch_size": 1000,
       "num_workers": 2,
-      "shuffle": true,
+      "shuffle": false,
       "datasets": [
         {
           "type": "DistributionDataset",
           "args": {
             "mcmc_type": "ULA",
             "gamma": 0.1,
-            "n_burn": 3000,
+            "n_burn": 2000,
             "n_clean": 1000
           }
         }
@@ -55,7 +55,7 @@
           "args": {
             "mcmc_type": "ULA",
             "gamma": 0.1,
-            "n_burn": 3000,
+            "n_burn": 2000,
             "n_clean": 1000
           }
         }
@@ -65,7 +65,7 @@
   "optimizer": {
     "type": "SGD",
     "args": {
-      "lr": 2e-2,
+      "lr": 1e-2,
       "momentum": 0.1,
       "weight_decay": 0.1
     }
@@ -74,20 +74,22 @@
     "type": "SmartLossESVM",
     "args": {
       "lag_func": "linear",
-      "bn": 50
+      "bn": 50,
+      "reg_lambda": 1
     }
   },
   "metric": {
     "type": "LossESVM",
     "args": {
       "lag_func": "linear",
-      "bn": 50
+      "bn": 50,
+      "reg_lambda": 1
     }
   },
   "lr_scheduler": {
     "type": "ExponentialLR",
     "args": {
-      "gamma": 0.98
+      "gamma": 0.95
     }
   },
   "trainer": {
@@ -101,6 +103,6 @@
     "wandb_project": "NeuralESVM-HSE-HDI",
     "log_step": 5,
     "val_step": 5,
-    "grad_norm_clip": 1
+    "grad_norm_clip": 100
   }
 }
