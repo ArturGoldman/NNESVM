@@ -11,7 +11,7 @@ def get_dataloader(configs: ConfigParser, target_dist, split, writer):
     params = configs["data"][split]
     num_workers = params.get("num_workers", 1)
 
-    drop_last = False
+    drop_last = True
 
     # create and join datasets
     datasets = []

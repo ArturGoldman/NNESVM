@@ -63,9 +63,10 @@ class Trainer(BaseTrainer):
 
         self.trial_num = self.config["data"]["val"]["Trials"]
         self.baseline_box = None
+        self.val_chains = None
 
         self.val_desc = self.config["data"]["val"]["datasets"][0]["args"]
-        self.val_generator = GenMCMC(self.target_distribution.grad_log,
+        self.val_generator = GenMCMC(self.target_distribution,
                                      self.val_desc["mcmc_type"], self.val_desc["gamma"])
 
     def _clip_grad_norm(self):
@@ -165,15 +166,18 @@ class Trainer(BaseTrainer):
         return cur_box, sum(vnfs) / len(vnfs), sum(vnfcvs) / len(vnfcvs)
         """
 
-        print("~~~~~~", description, "~~~~~~")
-        print("Parallel chain generation started")
-        st_time = time.time()
-        chains = self.val_generator.generate_parallel_chains(self.val_desc["n_burn"]+self.val_desc["n_clean"],
-                                                             self.target_distribution.dim, self.trial_num)
-        fin_time = time.time()
-        print(self.trial_num, "chains generated in", fin_time-st_time, "seconds")
-        chains = torch.stack(chains, dim=0)
-        chains = chains[:, self.val_desc["n_burn"]:, :]
+        if self.val_chains is None:
+            print("~~~~~~", description, "~~~~~~")
+            print("Parallel chain generation started")
+            st_time = time.time()
+            chains = self.val_generator.generate_parallel_chains(self.val_desc["n_burn"]+self.val_desc["n_clean"],
+                                                                 self.target_distribution.dim, self.trial_num,
+                                                                 self.val_desc["rseed"])
+            fin_time = time.time()
+            print(self.trial_num, "chains generated in", fin_time-st_time, "seconds")
+            chains = torch.stack(chains, dim=0)
+            chains = chains[:, self.val_desc["n_burn"]::self.val_desc["n_step"], :]
+            self.val_chains = chains
 
         nbcores = multiprocessing.cpu_count()
         ctx = torch.multiprocessing.get_context('spawn')
@@ -182,10 +186,11 @@ class Trainer(BaseTrainer):
 
         print("Parallel f(chain) calculation started")
         f_chains = multi.starmap(self.box_only,
-                                 [(self.function, chains[i]) for i in range(self.trial_num)])
+                                 [(self.function, self.val_chains[i]) for i in range(self.trial_num)])
         f_chains = torch.stack(f_chains, dim=0)
         print("Parallel f(chain) calculation finished")
         if to_cv:
+            # Calculate Empirical Spectral Variance
             print("Parallel vnfs calculation started")
             multi = ctx.Pool(nbcores)
             vnfs = multi.starmap(self.metric,
@@ -195,7 +200,7 @@ class Trainer(BaseTrainer):
             self.model = self.model.to('cpu')
             multi = ctx.Pool(nbcores)
             cvs = multi.starmap(process_cv,
-                                [(self.model, chains[i], 'cpu',
+                                [(self.model, self.val_chains[i], 'cpu',
                                   self.out_model_dim, self.target_distribution.dim,
                                   self.target_distribution.grad_log,
                                   False, self.cv_type, True) for i in range(self.trial_num)])
@@ -207,9 +212,13 @@ class Trainer(BaseTrainer):
                                [(f_chains[i], cvs[i]) for i in range(self.trial_num)])
             vnfcvs = torch.stack(vnfcvs, dim=0)
             print("Evaluations finished")
-            return (f_chains-cvs).mean(dim=(-1, -2)), vnfs.mean(), vnfcvs.mean()
+
+            # calculate Empirical Variance
+            v_base = torch.var(f_chains, dim=(-1, -2), unbiased=False).mean()
+            v_cur = torch.var(f_chains-cvs, dim=(-1, -2), unbiased=False).mean()
+            return (f_chains-cvs).mean(dim=(-1, -2)), vnfs.mean(), vnfcvs.mean(), v_base, v_cur
         else:
-            return f_chains.mean(dim=(-1, -2)), None, None
+            return f_chains.mean(dim=(-1, -2)), None, None, None, None
 
     def _valid_example(self):
         """
@@ -218,13 +227,16 @@ class Trainer(BaseTrainer):
         self.model.eval()
 
         if self.baseline_box is None:
-            self.baseline_box, _, _ = self.calc_box("Calculating baseline")
+            self.baseline_box, _, _, _, _ = self.calc_box("Calculating baseline")
 
-        cur_box, vnf, vnfcv = self.calc_box("Validating", to_cv=True)
+        cur_box, vnf, vnfcv, v_base, v_cur = self.calc_box("Validating", to_cv=True)
 
-        self.writer.add_scalar("V_n(f)", vnf)
-        self.writer.add_scalar("V_n(f-g)", vnfcv)
-        self.writer.add_scalar("V_n(f) over V_n(f-g)", vnf/vnfcv)
+        self.writer.add_scalar("V_n(f), ESV", vnf)
+        self.writer.add_scalar("V_n(f-g), ESV", vnfcv)
+        self.writer.add_scalar("V_n(f) over V_n(f-g), ESV", vnf/vnfcv)
+        self.writer.add_scalar("V_n(f), EV", v_base)
+        self.writer.add_scalar("V_n(f-g), EV", v_cur)
+        self.writer.add_scalar("V_n(f) over V_n(f-g), EV", v_base/v_cur)
         base_v = torch.var(self.baseline_box)
         base_c = torch.var(cur_box)
         self.writer.add_text("Var of means in boxplot (including outliers)",

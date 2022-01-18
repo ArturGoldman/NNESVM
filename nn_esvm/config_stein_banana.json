@@ -1,5 +1,5 @@
 {
-  "name": "banana_stein",
+  "name": "banana",
   "n_gpu": 1,
   "f(x)": {
     "type": "sec_coord",
@@ -10,40 +10,45 @@
   "arch": {
     "type": "MLP",
     "args": {
-      "dim": 8,
-      "out_dim": 8,
+      "dim": 2,
+      "out_dim": 2,
+      "pos_encoding_dim": 0,
       "hidden": 50,
       "blocks": 3,
-      "activation": "ReLU"
+      "activation": "LeakyReLU"
     }
   },
   "data": {
     "target_dist": {
       "type": "BananaShape",
       "args": {
-        "dim": 8,
-        "p": 100,
+        "dim": 2,
+        "p": 50,
         "b": 0.1
       }
     },
     "train": {
       "batch_size": 5000,
       "num_workers": 2,
+      "shuffle": false,
       "datasets": [
         {
           "type": "DistributionDataset",
           "args": {
             "mcmc_type": "ULA",
             "gamma": 0.01,
-            "n_burn": 10000,
-            "n_clean": 5000
+            "n_burn": 100000,
+            "n_clean": 1000000,
+            "n_step": 200,
+            "rseed": 184
           }
         }
       ]
     },
     "val": {
-      "batch_size": 5000,
+      "batch_size": 10000,
       "num_workers": 2,
+      "shuffle": false,
       "Trials": 100,
       "datasets": [
         {
@@ -51,8 +56,10 @@
           "args": {
             "mcmc_type": "ULA",
             "gamma": 0.01,
-            "n_burn": 10000,
-            "n_clean": 5000
+            "n_burn": 100000,
+            "n_clean": 1000000,
+            "n_step": 500,
+            "rseed": 926
           }
         }
       ]
@@ -61,38 +68,39 @@
   "optimizer": {
     "type": "SGD",
     "args": {
-      "lr": 2e-2,
-      "momentum": 0.1,
-      "weight_decay": 0.1
+      "lr": 1e-3,
+      "momentum": 0.7
     }
   },
   "loss_spec": {
     "type": "SmartLossESVM",
     "args": {
       "lag_func": "linear",
-      "bn": 300
+      "bn": 50,
+      "reg_lambda": 0
     }
   },
   "metric": {
     "type": "LossESVM",
     "args": {
       "lag_func": "linear",
-      "bn": 300
+      "bn": 50,
+      "reg_lambda": 0
     }
   },
   "lr_scheduler": {
     "type": "ExponentialLR",
     "args": {
-      "gamma": 0.999
+      "gamma": 0.998
     }
   },
   "trainer": {
-    "epochs": 10,
+    "epochs": 30,
     "save_dir": "saved/",
     "save_period": 10,
     "verbosity": 2,
     "monitor": "min loss_esv",
-    "early_stop": 25,
+    "early_stop": 30,
     "visualize": "wandb",
     "wandb_project": "NeuralESVM-HSE-HDI",
     "log_step": 5,

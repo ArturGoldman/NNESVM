@@ -29,7 +29,7 @@
       }
     },
     "train": {
-      "batch_size": 1000,
+      "batch_size": 5000,
       "num_workers": 2,
       "shuffle": false,
       "datasets": [
@@ -38,8 +38,10 @@
           "args": {
             "mcmc_type": "ULA",
             "gamma": 0.1,
-            "n_burn": 2000,
-            "n_clean": 1000
+            "n_burn": 3000,
+            "n_clean": 5000,
+            "n_step": 1,
+            "rseed": 184
           }
         }
       ]
@@ -56,7 +58,9 @@
             "mcmc_type": "ULA",
             "gamma": 0.1,
             "n_burn": 2000,
-            "n_clean": 1000
+            "n_clean": 1000,
+            "n_step": 1,
+            "rseed": 926
           }
         }
       ]
@@ -66,8 +70,7 @@
     "type": "SGD",
     "args": {
       "lr": 1e-2,
-      "momentum": 0.1,
-      "weight_decay": 0.1
+      "momentum": 0.1
     }
   },
   "loss_spec": {
@@ -75,7 +78,7 @@
     "args": {
       "lag_func": "linear",
       "bn": 50,
-      "reg_lambda": 1
+      "reg_lambda": 0
     }
   },
   "metric": {
@@ -83,7 +86,7 @@
     "args": {
       "lag_func": "linear",
       "bn": 50,
-      "reg_lambda": 1
+      "reg_lambda": 0
     }
   },
   "lr_scheduler": {
@@ -93,7 +96,7 @@
     }
   },
   "trainer": {
-    "epochs": 15,
+    "epochs": 30,
     "save_dir": "saved/",
     "save_period": 10,
     "verbosity": 2,
@@ -102,7 +105,6 @@
     "visualize": "wandb",
     "wandb_project": "NeuralESVM-HSE-HDI",
     "log_step": 5,
-    "val_step": 5,
-    "grad_norm_clip": 100
+    "val_step": 5
   }
 }
