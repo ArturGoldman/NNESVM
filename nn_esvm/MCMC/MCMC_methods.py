@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 from tqdm import tqdm
 import multiprocessing
+from pyro.infer import HMC, MCMC, NUTS
 
 
 def ula_step(prev_point, dist, gamma):
@@ -34,24 +35,93 @@ class GenMCMC(nn.Module):
             "MALA": mala_step
         }
 
-    def gen_samples(self, n_samples, dim, rseed=None):
+    def energy(self, z):
+        z = z["points"]
+        if z.dim() == 1:
+            return -self.dist.log_prob(z.unsqueeze(0))
+        return -self.dist.log_prob(z)
+
+    def generate_chains_pyro(self, n_burn, n_clean, T, rseed=926):
         if rseed is not None:
             torch.manual_seed(rseed)
-        prev_point = 5*torch.randn(dim).reshape(1, -1)
+
+        if self.mcmc_type == "HMC":
+            kernel = HMC(potential_fn=self.energy, step_size=self.gamma,
+                         num_steps=5, adapt_step_size=True, full_mass=False)
+        elif self.mcmc_type == "NUTS":
+            kernel = NUTS(potential_fn=self.energy, full_mass=False)
+        else:
+            raise ValueError("MCMC sampler is not recognised")
+        nbcores = multiprocessing.cpu_count()
+        true_t = min(nbcores-1, T)
+        if true_t < T:
+            all_chains = []
+            for i in range(T//true_t):
+                start_points = 5 * torch.randn((true_t, self.dist.dim))
+                init_params = {"points": start_points}
+                mcmc = MCMC(kernel, num_samples=n_clean, warmup_steps=n_burn,
+                            num_chains=true_t, initial_params=init_params, mp_context='spawn')
+                mcmc.run()
+                chains = mcmc.get_samples(group_by_chain=True)
+                all_chains.append(chains["points"].squeeze())
+
+            start_points = 5 * torch.randn((T%true_t, self.dist.dim))
+            init_params = {"points": start_points}
+            mcmc = MCMC(kernel, num_samples=n_clean, warmup_steps=n_burn,
+                        num_chains=T%true_t, initial_params=init_params, mp_context='spawn')
+            mcmc.run()
+            chains = mcmc.get_samples(group_by_chain=True)
+            all_chains.append(chains["points"].squeeze())
+            return torch.cat(all_chains, dim=0)
+        else:
+            start_points = 5 * torch.randn((T, self.dist.dim))
+            init_params = {"points": start_points}
+            mcmc = MCMC(kernel, num_samples=n_clean, warmup_steps=n_burn,
+                        num_chains=T, initial_params=init_params, mp_context='spawn')
+            mcmc.run()
+            chains = mcmc.get_samples(group_by_chain=True)
+
+            # squeeze seems to work ok here: if chain is one, it removes redundant dimension, otherwise leaves it
+            return chains["points"].squeeze()
+
+    def gen_samples(self, n_burn, n_clear, rseed=None):
+        """
+        Generates one chain
+        :param n_burn:
+        :param n_clear:
+        :param rseed:
+        :return: [n_clear, dim]
+        """
+        if self.mcmc_type not in self.mapping:
+            return self.generate_chains_pyro(n_burn, n_clear, 1, rseed=rseed)
+        if rseed is not None:
+            torch.manual_seed(rseed)
+        prev_point = 5*torch.randn(self.dist.dim).reshape(1, -1)
         samples = [prev_point]
-        for i in tqdm(range(n_samples), desc="Generating samples"):
+        # start from 1, because we already have one starting point
+        for i in tqdm(range(1, n_burn+n_clear), desc="Generating samples"):
             new_point = self.mapping[self.mcmc_type](prev_point, self.dist, self.gamma)
             samples.append(new_point)
             prev_point = new_point
-        return torch.cat(samples, dim=0)
+        return torch.cat(samples, dim=0)[n_burn:]
 
-    def generate_parallel_chains(self, n_samples, dim, T, rseed=926):
+    def generate_parallel_chains(self, n_burn, n_clear, T, rseed=926):
+        """
+        Generates multiple chains
+        :param n_burn:
+        :param n_clear:
+        :param T:
+        :param rseed:
+        :return: [T, n_clear, dim]
+        """
+        if self.mcmc_type not in self.mapping:
+            return self.generate_chains_pyro(n_burn, n_clear, T, rseed=rseed)
         nbcores = multiprocessing.cpu_count()
         ctx = multiprocessing.get_context('spawn')
         print("Total cores for multiprocessing", nbcores)
         multi = ctx.Pool(nbcores)
         res = multi.starmap(self.gen_samples,
-                            [(n_samples,
-                              dim,
+                            [(n_burn, n_clear,
                               rseed + i) for i in range(T)])
-        return res
+        return torch.stack(res, dim=0)[:, n_burn:]
+

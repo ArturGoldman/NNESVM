@@ -1,0 +1,34 @@
+{
+  "name": "generate_config",
+  "n_gpu": 1,
+  "to_check": false,
+  "target_dist": {
+    "type": "BananaShape",
+    "args": {
+      "dim": 2,
+      "p": 100,
+      "b": 0.1
+    }
+  },
+  "chain_details": {
+    "mcmc_type": "NUTS",
+    "gamma": 0.1,
+    "n_burn": 100,
+    "n_clean": 100,
+    "n_chains": 30,
+    "rseed": 926
+  },
+  "trainer": {
+    "epochs": 30,
+    "save_dir": "saved/",
+    "save_period": 10,
+    "verbosity": 2,
+    "monitor": "min loss_esv",
+    "early_stop": 30,
+    "visualize": "wandb",
+    "wandb_project": "NeuralESVM-HSE-HDI",
+    "log_step": 5,
+    "val_step": 5,
+    "grad_norm_clip": 200
+  }
+}

@@ -1,9 +1,9 @@
 numpy
-torch==1.10.0
 tqdm
 tensorboard
 matplotlib
 plotly
+pyro
 
 pandas
 wandb

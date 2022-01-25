@@ -1,13 +1,35 @@
+import numpy as np
 import torch
-from nn_esvm.distributions.distributions import BananaShape, GMM
+from nn_esvm.distributions.distributions import BananaShape, GMM, Funnel
 import matplotlib.pyplot as plt
 from nn_esvm.MCMC import GenMCMC
 
 
-def plot_dist(cur, n_samples=10**3):
+def plot_samples(cur, n_samples=10**3):
     samples = cur.sample(n_samples)
     plt.figure(figsize=(12, 8))
     plt.scatter(samples[:, 0], samples[:, 1], c=cur.log_prob(samples))
+    plt.grid()
+    plt.show()
+
+def plot_dist(cur):
+    xlim = [-2, 3]
+    ylim = [-6, 6]
+
+    x = np.linspace(*xlim, 100)
+    y = np.linspace(*ylim, 100)
+    points = []
+    fval = []
+    for xx in x:
+        for yy in y:
+            points.append([xx, yy])
+            fval.append(cur.log_prob(torch.tensor([[xx, yy]])))
+    points = np.array(points)
+    plt.figure(figsize=(12, 8))
+    sc = plt.scatter(points[:, 0], points[:, 1], c=torch.stack(fval, dim=0))
+    plt.colorbar(sc)
+    plt.xlabel("X")
+    plt.ylabel("Y")
     plt.grid()
     plt.show()
 
@@ -23,22 +45,15 @@ def check_log(cur):
     print(A)
     print(cur.log_prob(A))
 
-    samples = cur.sample(1000)
-    plt.figure(figsize=(12, 8))
-    plt.scatter(samples[:, 0], samples[:, 1], c=cur.log_prob(samples))
-    plt.grid()
-    plt.show()
-
-
 def check_grad(cur):
     A = torch.arange(0, 16).reshape(-1, 2).float()
     print(A)
     print(cur.grad_log(A))
+    print(cur.grad_log(A).size())
 
 def check_MC(cur, n_burn=1000, n_clean=1000, mc_type="ULA", gamma=0.1):
     generator = GenMCMC(cur, mc_type, gamma)
-    samples = generator.gen_samples(n_burn+n_clean, cur.dim, rseed=926)
-    # samples = samples[n_burn:]
+    samples = generator.gen_samples(n_burn, n_clean, rseed=926)
     plt.figure(figsize=(12, 8))
     #plt.plot(samples[:, 0], samples[:, 1])
     plt.scatter(samples[:, 0], samples[:, 1], c=cur.log_prob(samples))
@@ -47,7 +62,7 @@ def check_MC(cur, n_burn=1000, n_clean=1000, mc_type="ULA", gamma=0.1):
 
 def check_MC_sparse(cur, n_burn=1000, n_clean=1000, mc_type="ULA", gamma=0.1, step=10):
     generator = GenMCMC(cur, mc_type, gamma)
-    samples = generator.gen_samples(n_burn+n_clean, cur.dim)
+    samples = generator.gen_samples(n_burn, n_clean)
     # samples = samples[n_burn:]
     plt.figure(figsize=(12, 8))
     #plt.plot(samples[:, 0], samples[:, 1])
@@ -59,9 +74,10 @@ def check_MC_sparse(cur, n_burn=1000, n_clean=1000, mc_type="ULA", gamma=0.1, st
     plt.grid()
     plt.show()
 
-def test_bias(cur, n_burn=1000, n_clean=1000, mc_type="ULA", gamma=0.1, step=10, n_exp=100):
+def check_bias(cur, n_burn=1000, n_clean=1000, mc_type="ULA", gamma=0.1, step=10, n_exp=100):
     generator = GenMCMC(cur, mc_type, gamma)
-    samples = generator.generate_parallel_chains(n_burn + n_clean, cur.dim, n_exp, rseed=926)
+    samples = generator.generate_parallel_chains(n_burn, n_clean, n_exp, rseed=926)
+    print(samples.size())
 
     """
     samples = []
@@ -69,9 +85,7 @@ def test_bias(cur, n_burn=1000, n_clean=1000, mc_type="ULA", gamma=0.1, step=10,
         samples.append(cur.sample(n_clean))
     """
 
-    samples = torch.stack(samples, dim=0)
-    print(samples.size())
-    samples = samples[:, n_burn::step, :]
+    samples = samples[:, ::step, :]
 
     for i in range(15):
         plt.scatter(samples[i, :, 0], samples[i, :, 1], c=cur.log_prob(samples[i]))
@@ -89,17 +103,18 @@ def test_bias(cur, n_burn=1000, n_clean=1000, mc_type="ULA", gamma=0.1, step=10,
     plt.show()
 
 def run_tests(dist, n_burn=1000, n_clean=1000, mc_type="ULA", gamma=0.1, step=10):
-    #plot_dist(dist, 10**2)
+    #plot_dist(dist)
     #check_potential(dist)
     #check_log(dist)
     #check_grad(dist)
-    #check_MC(dist, n_burn, n_clean, mc_type, gamma)
+    check_MC(dist, n_burn, n_clean, mc_type, gamma)
     #check_MC_sparse(dist, n_burn, n_clean, mc_type, gamma, step)
-    test_bias(dist, n_burn, n_clean, mc_type, gamma, step)
+    #check_bias(dist, n_burn, n_clean, mc_type, gamma, step)
 
 
 if __name__ == "__main__":
-    dist = BananaShape(2, p=30)
-    #dist = GMM(2, 0.5)
-    run_tests(dist, 10**5, 10**6, "ULA", 0.01, 1)
+    dist = Funnel(2)
+    #dist = BananaShape(2, p=100)
+    #dist = GMM(2, 1)
+    run_tests(dist, 10**5, 10**6, "MALA", 0.1, 1)
 

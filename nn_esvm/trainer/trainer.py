@@ -170,13 +170,13 @@ class Trainer(BaseTrainer):
             print("~~~~~~", description, "~~~~~~")
             print("Parallel chain generation started")
             st_time = time.time()
-            chains = self.val_generator.generate_parallel_chains(self.val_desc["n_burn"]+self.val_desc["n_clean"],
-                                                                 self.target_distribution.dim, self.trial_num,
+            chains = self.val_generator.generate_parallel_chains(self.val_desc["n_burn"], self.val_desc["n_clean"],
+                                                                 self.trial_num,
                                                                  self.val_desc["rseed"])
             fin_time = time.time()
             print(self.trial_num, "chains generated in", fin_time-st_time, "seconds")
             chains = torch.stack(chains, dim=0)
-            chains = chains[:, self.val_desc["n_burn"]::self.val_desc["n_step"], :]
+            chains = chains[:, ::self.val_desc["n_step"], :]
             self.val_chains = chains
 
         nbcores = multiprocessing.cpu_count()

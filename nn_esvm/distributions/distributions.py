@@ -1,3 +1,4 @@
+import math
 import torch
 import torch.nn as nn
 import torch.distributions as D
@@ -10,10 +11,31 @@ grad_log function: function which computes gradient of log density
 """
 
 
-class BananaShape(nn.Module):
-    def __init__(self, dim, p=100, b=0.1):
+class MyDistribution(nn.Module):
+    def __init__(self, dim):
         super().__init__()
         self.dim = dim
+
+    def log_prob(self, x: torch.Tensor):
+        """
+        Calculates log density up to additive constant
+        :param x: [n_batch, dimension]
+        :return: log_prob [n_batch, ]
+        """
+        raise NotImplementedError
+
+    def grad_log(self, x: torch.Tensor):
+        """
+        Calculates gradient of log density for given points
+        :param x: [n_batch, dimension]
+        :return: gradients [n_batch, dimension]
+        """
+        raise NotImplementedError
+
+
+class BananaShape(MyDistribution):
+    def __init__(self, dim, p=100, b=0.1):
+        super().__init__(dim)
         if dim < 2:
             raise ValueError("Not enough dimensions")
         self.p = p
@@ -31,9 +53,12 @@ class BananaShape(nn.Module):
         return samples
 
     def log_prob(self, x: torch.Tensor):
+        """
         y = x.clone()
         y[:, 1] = y[:, 1] + self.b * y[:, 0] ** 2 - self.p * self.b
         return self.base_dist.log_prob(y)
+        """
+        return -(x[:, 0]**2/(2*self.p) + (x[:, 1] + self.b*x[:, 0]**2 - self.p*self.b)**2/2 + (x[:, 2:]**2/2).sum(-1))
 
     def grad_log(self, x: torch.Tensor):
         y = x.clone()
@@ -44,10 +69,9 @@ class BananaShape(nn.Module):
         return -y
 
 
-class GMM(nn.Module):
+class GMM(MyDistribution):
     def __init__(self, dim, mu, sigma="I", rho=0.5):
-        super().__init__()
-        self.dim = dim
+        super().__init__(dim)
         if sigma == "I":
             cov_mat = torch.eye(dim)
         else:
@@ -75,3 +99,31 @@ class GMM(nn.Module):
 
     def sample(self, n):
         return self.gmm.sample((n,))
+
+
+class Funnel(MyDistribution):
+    def __init__(self, dim, a=1, b=0.5):
+        super().__init__(dim)
+        if self.dim % 2 != 0:
+            raise ValueError("Please, specify even number of dimensions for Funnel distribution")
+        self.a = a
+        self.b = b
+
+    def log_prob(self, x):
+        logprob1 = -x[:, 0]**2/(2*self.a)
+        logprob2 = -(
+            torch.exp(-2*self.b*x[:, 0]) *
+            (x[:, 1:]**2 - math.log(self.dim//2) + (2*self.b*x[:, 0])[:, None]).sum(-1)
+        )
+        return logprob1 + logprob2
+
+    def grad_log(self, x: torch.Tensor):
+        grads = []
+        x.requires_grad = True
+        for val in x:
+            val = val.reshape(1, -1)
+            out = self.log_prob(val)
+            grad = torch.autograd.grad(out, val)
+            grads.append(grad[0].squeeze(0))
+        x.requires_grad = False
+        return torch.stack(grads, dim=0)

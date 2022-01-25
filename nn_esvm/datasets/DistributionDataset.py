@@ -8,8 +8,8 @@ class DistributionDataset(nn.Module):
         super().__init__()
         self.generator = GenMCMC(dist, mcmc_type, gamma)
         self.dist = dist
-        chain = self.generator.gen_samples(n_burn+n_clean, dist.dim, rseed=rseed)
-        self.chain = chain[n_burn::n_step]
+        chain = self.generator.gen_samples(n_burn, n_clean, rseed=rseed)
+        self.chain = chain[::n_step]
         self.len = self.chain.size(0)
 
     def __getitem__(self, index: int):
