@@ -34,7 +34,7 @@ def main(config):
     }
     save_dir = Path(config["trainer"]["save_dir"])
     sec_part = config["target_dist"]['type']+'_'+str(config["target_dist"]['args']['dim'])+\
-               '_'+config["chain_details"]["mcmc_type"]+'.pth'
+               '_'+config["chain_details"]["mcmc_type"]+'_'+str(config["chain_details"]["rseed"])+'.pth'
     save_name = save_dir/"data"
     save_name.mkdir(parents=True, exist_ok=True)
     save_name = save_name/sec_part

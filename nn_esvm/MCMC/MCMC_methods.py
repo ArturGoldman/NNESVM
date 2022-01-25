@@ -123,5 +123,5 @@ class GenMCMC(nn.Module):
         res = multi.starmap(self.gen_samples,
                             [(n_burn, n_clear,
                               rseed + i) for i in range(T)])
-        return torch.stack(res, dim=0)[:, n_burn:]
+        return torch.stack(res, dim=0)
 

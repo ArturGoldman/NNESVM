@@ -1,21 +1,21 @@
 {
-  "name": "generate_config",
+  "name": "funnel2dim",
   "n_gpu": 1,
   "to_check": false,
   "target_dist": {
-    "type": "BananaShape",
+    "type": "Funnel",
     "args": {
       "dim": 2,
-      "p": 100,
-      "b": 0.1
+      "a": 1,
+      "b": 0.5
     }
   },
   "chain_details": {
     "mcmc_type": "NUTS",
     "gamma": 0.1,
-    "n_burn": 100,
-    "n_clean": 100,
-    "n_chains": 30,
+    "n_burn": 10000,
+    "n_clean": 10000,
+    "n_chains": 31,
     "rseed": 926
   },
   "trainer": {

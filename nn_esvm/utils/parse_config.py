@@ -140,7 +140,7 @@ class ConfigParser:
 
     @classmethod
     def get_default_configs(cls):
-        config_path = ROOT_PATH / 'nn_esvm' / 'config.json'
+        config_path = ROOT_PATH / 'nn_esvm' / 'configs'/ 'config.json'
         with config_path.open() as f:
             return cls(json.load(f))
 
