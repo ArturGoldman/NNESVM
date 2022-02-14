@@ -27,10 +27,19 @@ class MyDistribution(nn.Module):
     def grad_log(self, x: torch.Tensor):
         """
         Calculates gradient of log density for given points
+        Expects log_prob function to be working in differentiable manner
         :param x: [n_batch, dimension]
         :return: gradients [n_batch, dimension]
         """
-        raise NotImplementedError
+        grads = []
+        x.requires_grad = True
+        for val in x:
+            val = val.reshape(1, -1)
+            out = self.log_prob(val)
+            grad = torch.autograd.grad(out, val)
+            grads.append(grad[0].squeeze(0))
+        x.requires_grad = False
+        return torch.stack(grads, dim=0)
 
 
 class BananaShape(MyDistribution):
@@ -87,16 +96,6 @@ class GMM(MyDistribution):
     def log_prob(self, x):
         return self.gmm.log_prob(x)
 
-    def grad_log(self, x: torch.Tensor):
-        grads = []
-        x.requires_grad = True
-        for val in x:
-            out = self.log_prob(val)
-            grad = torch.autograd.grad(out, val)
-            grads.append(grad[0])
-        x.requires_grad = False
-        return torch.stack(grads, dim=0)
-
     def sample(self, n):
         return self.gmm.sample((n,))
 
@@ -111,19 +110,26 @@ class Funnel(MyDistribution):
 
     def log_prob(self, x):
         logprob1 = -x[:, 0]**2/(2*self.a)
-        logprob2 = -(
-            torch.exp(-2*self.b*x[:, 0]) *
-            (x[:, 1:]**2 - math.log(self.dim//2) + (2*self.b*x[:, 0])[:, None]).sum(-1)
+
+        """
+        logprob2 = (
+                -torch.exp(-2*self.b*x[:, 0]) *
+                (x[:, 1:]**2).sum(-1)
+                - math.log(self.dim)
+                + (2*self.b*x[:, 0])
         )
+        """
+
+        logprob2 = (
+                -torch.exp(-2*self.b*x[:, 0]) *
+                (x[:, 1:]**2/2).sum(-1)
+                - ((self.dim-1)*self.b*x[:, 0])
+        )
+
         return logprob1 + logprob2
 
-    def grad_log(self, x: torch.Tensor):
-        grads = []
-        x.requires_grad = True
-        for val in x:
-            val = val.reshape(1, -1)
-            out = self.log_prob(val)
-            grad = torch.autograd.grad(out, val)
-            grads.append(grad[0].squeeze(0))
-        x.requires_grad = False
-        return torch.stack(grads, dim=0)
+    def sample(self, n):
+        all_c = torch.randn((n, self.dim))
+        all_c[:, 0] = all_c[:, 0] * self.a**0.5
+        all_c[:, 1:] = all_c[:, 1:]*(torch.exp(self.b*all_c[:, 0]))[:, None]
+        return all_c

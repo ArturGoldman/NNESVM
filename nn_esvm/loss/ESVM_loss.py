@@ -1,6 +1,7 @@
 from torch import nn, Tensor
 import torch
 from tqdm import tqdm
+import math
 
 
 class LossESVM(nn.Module):
@@ -12,10 +13,26 @@ class LossESVM(nn.Module):
             return -2*abs(s)+2
         return 1
 
+    @staticmethod
+    def triangular_w(s):
+        if abs(s) > 1:
+            raise ValueError('Lag function got unexpected value')
+        return 1-abs(s)
+
+    @staticmethod
+    def cosine_w(s):
+        if abs(s) > 1:
+            raise ValueError('Lag function got unexpected value')
+        return 0.5+0.5*math.cos(math.pi*abs(s))
+
     def __init__(self, lag_func="linear", bn=50, reg_lambda=0.):
         super().__init__()
         if lag_func == "linear":
             self.lagf = self.linear_w
+        elif lag_func == "triangular":
+            self.lagf = self.triangular_w
+        elif lag_func == "cosine":
+            self.lagf = self.cosine_w
         else:
             raise RuntimeError('Passed lag function was not recognised')
         self.bn = bn
@@ -70,19 +87,3 @@ class SmartLossESVM(LossESVM):
         loss_accum += loss.item()
         loss.backward()
         return torch.tensor(loss_accum)
-
-
-    @staticmethod
-    @torch.no_grad()
-    def get_grad_norm(model, norm_type=2):
-        parameters = model.parameters()
-        if isinstance(parameters, torch.Tensor):
-            parameters = [parameters]
-        parameters = [p for p in parameters if p.grad is not None]
-        total_norm = torch.norm(
-            torch.stack(
-                [torch.norm(p.grad.detach(), norm_type).cpu() for p in parameters]
-            ),
-            norm_type,
-        )
-        return total_norm.item()

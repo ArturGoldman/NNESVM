@@ -33,6 +33,9 @@ class Trainer(BaseTrainer):
             skip_oom=True
     ):
         super().__init__(model, optimizer, lr_scheduler, config, device)
+
+        self.logger.info("Run_id: {}".format(config.run_id))
+
         self.skip_oom = skip_oom
         self.config = config
 
@@ -63,9 +66,15 @@ class Trainer(BaseTrainer):
 
         self.trial_num = self.config["data"]["val"]["Trials"]
         self.baseline_box = None
-        self.val_chains = None
 
         self.val_desc = self.config["data"]["val"]["datasets"][0]["args"]
+        self.val_chains = None
+        if self.config["data"]["val"].get("folder_name", None) is not None:
+            checkpoint = torch.load(self.config["data"]["val"]["folder_name"])
+            chains = checkpoint["chains"]
+            chains = chains[:, ::self.val_desc["n_step"], :]
+            self.val_chains = chains[1:]
+
         self.val_generator = GenMCMC(self.target_distribution,
                                      self.val_desc["mcmc_type"], self.val_desc["gamma"])
 
@@ -129,7 +138,7 @@ class Trainer(BaseTrainer):
         self.optimizer.zero_grad()
         outputs = process_cv(self.model, batch, self.device, self.out_model_dim,
                              self.target_distribution.dim, self.target_distribution.grad_log,
-                             cr_gr=True, mode=self.cv_type).reshape(-1, 1)
+                             cr_gr=True, mode=self.cv_type)
         loss_esv = self.criterion(self.function(batch), outputs)
         # smart loss does backward itself
         if "Smart" not in self.config["loss_spec"]["type"]:
@@ -182,33 +191,33 @@ class Trainer(BaseTrainer):
         nbcores = multiprocessing.cpu_count()
         ctx = torch.multiprocessing.get_context('spawn')
         print("Total cores for multiprocessing", nbcores)
-        multi = ctx.Pool(nbcores)
 
         print("Parallel f(chain) calculation started")
-        f_chains = multi.starmap(self.box_only,
-                                 [(self.function, self.val_chains[i]) for i in range(self.trial_num)])
+        with ctx.Pool(nbcores) as multi:
+            f_chains = multi.starmap(self.box_only,
+                                     [(self.function, self.val_chains[i]) for i in range(self.trial_num)])
         f_chains = torch.stack(f_chains, dim=0)
         print("Parallel f(chain) calculation finished")
         if to_cv:
             # Calculate Empirical Spectral Variance
             print("Parallel vnfs calculation started")
-            multi = ctx.Pool(nbcores)
-            vnfs = multi.starmap(self.metric,
+            with ctx.Pool(nbcores) as multi:
+                vnfs = multi.starmap(self.metric,
                              [(f_chains[i], None) for i in range(self.trial_num)])
             vnfs = torch.stack(vnfs, dim=0)
             print("Parallel cvs calculation started")
             self.model = self.model.to('cpu')
-            multi = ctx.Pool(nbcores)
-            cvs = multi.starmap(process_cv,
+            with ctx.Pool(nbcores) as multi:
+                cvs = multi.starmap(process_cv,
                                 [(self.model, self.val_chains[i], 'cpu',
                                   self.out_model_dim, self.target_distribution.dim,
                                   self.target_distribution.grad_log,
                                   False, self.cv_type, True) for i in range(self.trial_num)])
             self.model = self.model.to(self.device)
-            cvs = torch.stack(cvs, dim=0).unsqueeze(-1)
+            cvs = torch.stack(cvs, dim=0)
             print("Parallel vnfcvs calculation started")
-            multi = ctx.Pool(nbcores)
-            vnfcvs = multi.starmap(self.metric,
+            with ctx.Pool(nbcores) as multi:
+                vnfcvs = multi.starmap(self.metric,
                                [(f_chains[i], cvs[i]) for i in range(self.trial_num)])
             vnfcvs = torch.stack(vnfcvs, dim=0)
             print("Evaluations finished")

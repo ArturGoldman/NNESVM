@@ -33,7 +33,7 @@ def process_cv(model, batch, operating_device,
                 outs = model(batch)
         else:
             outs = model(batch)
-        return torch.stack(laplacians) + (log_grads*outs).sum(dim=1)
+        return (torch.stack(laplacians) + (log_grads*outs).sum(dim=1)).reshape(-1, 1)
     else:
         raise ValueError("Unrecognised CV type")
 

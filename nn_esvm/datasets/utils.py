@@ -3,6 +3,7 @@ from operator import xor
 from torch.utils.data import DataLoader, ConcatDataset
 
 import nn_esvm.datasets
+import nn_esvm.collator
 from nn_esvm.utils.parse_config import ConfigParser
 import matplotlib.pyplot as plt
 
@@ -10,6 +11,10 @@ import matplotlib.pyplot as plt
 def get_dataloader(configs: ConfigParser, target_dist, split, writer):
     params = configs["data"][split]
     num_workers = params.get("num_workers", 1)
+
+    collate_fn = None
+    if "collate_fn" in params:
+        collate_fn = configs.init_obj(params["collate_fn"], nn_esvm.collator)
 
     drop_last = True
 
@@ -24,14 +29,16 @@ def get_dataloader(configs: ConfigParser, target_dist, split, writer):
         dataset = ConcatDataset(datasets)
     else:
         dataset = datasets[0]
-    if target_dist.dim == 2:
+
+    # plot two first coordinates
+    if target_dist.dim > 1:
         ch = dataset.chain
         plt.figure(figsize=(12, 8))
         plt.scatter(ch[:, 0], ch[:, 1], c=target_dist.log_prob(ch))
         plt.grid()
         plt.xlabel("$X_1$")
         plt.ylabel("$X_2$")
-        writer.add_image("Training_chain", plt)
+        writer.add_image("Training_chain, first two coords", plt)
 
     # select batch size or batch sampler
     assert xor("batch_size" in params, "batch_sampler" in params), \
@@ -47,6 +54,7 @@ def get_dataloader(configs: ConfigParser, target_dist, split, writer):
     dataloader = DataLoader(
         dataset, batch_size=bs,
         shuffle=shuffle, num_workers=num_workers,
-        batch_sampler=batch_sampler, drop_last=drop_last
+        batch_sampler=batch_sampler, drop_last=drop_last,
+        collate_fn=collate_fn
     )
     return dataloader

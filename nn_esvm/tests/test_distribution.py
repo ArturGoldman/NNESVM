@@ -102,12 +102,25 @@ def check_bias(cur, n_burn=1000, n_clean=1000, mc_type="ULA", gamma=0.1, step=10
     plt.grid()
     plt.show()
 
+def see_chains(file_name, cur):
+    checkpoint = torch.load(file_name)
+    chains = checkpoint["chains"]
+    print(chains.size())
+    for i in range(chains.size(0)):
+        samples = chains[i]
+        plt.figure(figsize=(12, 8))
+        plt.scatter(samples[:, 0], samples[:, 1], c=cur.log_prob(samples))
+        plt.grid()
+        plt.show()
+
+
 def run_tests(dist, n_burn=1000, n_clean=1000, mc_type="ULA", gamma=0.1, step=10):
+    plot_samples(dist, 10**4)
     #plot_dist(dist)
     #check_potential(dist)
     #check_log(dist)
     #check_grad(dist)
-    check_MC(dist, n_burn, n_clean, mc_type, gamma)
+    #check_MC(dist, n_burn, n_clean, mc_type, gamma)
     #check_MC_sparse(dist, n_burn, n_clean, mc_type, gamma, step)
     #check_bias(dist, n_burn, n_clean, mc_type, gamma, step)
 
@@ -116,5 +129,6 @@ if __name__ == "__main__":
     dist = Funnel(2)
     #dist = BananaShape(2, p=100)
     #dist = GMM(2, 1)
-    run_tests(dist, 10**5, 10**6, "MALA", 0.1, 1)
+    #run_tests(dist, 10**5, 10**6, "MALA", 0.1, 1)
+    see_chains('../../saved/data/Funnel_10_NUTS_926.pth', dist)
 

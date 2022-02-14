@@ -1,8 +1,8 @@
 {
-  "name": "banana",
+  "name": "funnel_40",
   "n_gpu": 1,
   "f(x)": {
-    "type": "sec_coord",
+    "type": "sec_coord_square",
     "args": {
     }
   },
@@ -10,8 +10,8 @@
   "arch": {
     "type": "MLP",
     "args": {
-      "dim": 2,
-      "out_dim": 2,
+      "dim": 40,
+      "out_dim": 40,
       "pos_encoding_dim": 0,
       "hidden": 50,
       "blocks": 3,
@@ -20,45 +20,47 @@
   },
   "data": {
     "target_dist": {
-      "type": "BananaShape",
+      "type": "Funnel",
       "args": {
-        "dim": 2,
-        "p": 50,
-        "b": 0.1
+        "dim": 40,
+        "a": 1,
+        "b": 0.5
       }
     },
     "train": {
-      "batch_size": 5000,
+      "batch_size": 30000,
       "num_workers": 2,
+      "collate_fn": {
+        "type": "CollateSubSample",
+        "args": {
+          "subsample_sz": 6000
+        }
+      },
       "shuffle": false,
       "datasets": [
         {
-          "type": "DistributionDataset",
+          "type": "FolderDataset",
           "args": {
-            "mcmc_type": "ULA",
-            "gamma": 0.01,
-            "n_burn": 100000,
-            "n_clean": 1000000,
-            "n_step": 200,
-            "rseed": 184
+            "n_step": 1,
+            "folder_name": "saved/data/Funnel_40_NUTS_926.pth"
           }
         }
       ]
     },
     "val": {
-      "batch_size": 2000,
-      "num_workers": 2,
       "shuffle": false,
-      "Trials": 100,
+      "Trials": 30,
+      "folder_name": "saved/data/Funnel_40_NUTS_926.pth",
       "datasets": [
         {
           "type": "DistributionDataset",
           "args": {
-            "mcmc_type": "ULA",
-            "gamma": 0.01,
-            "n_burn": 100000,
-            "n_clean": 1000000,
-            "n_step": 500,
+            "mcmc_type": "NUTS",
+            "gamma": 0.1,
+            "prop_scale": 1,
+            "n_burn": 10000,
+            "n_clean": 30000,
+            "n_step": 3,
             "rseed": 926
           }
         }
@@ -66,36 +68,35 @@
     }
   },
   "optimizer": {
-    "type": "SGD",
+    "type": "Adam",
     "args": {
-      "lr": 1e-3,
-      "momentum": 0.7
+      "lr": 1e-2
     }
   },
   "loss_spec": {
     "type": "SmartLossESVM",
     "args": {
-      "lag_func": "linear",
-      "bn": 50,
+      "lag_func": "triangular",
+      "bn": 10,
       "reg_lambda": 0
     }
   },
   "metric": {
     "type": "LossESVM",
     "args": {
-      "lag_func": "linear",
-      "bn": 50,
+      "lag_func": "triangular",
+      "bn": 10,
       "reg_lambda": 0
     }
   },
   "lr_scheduler": {
     "type": "ExponentialLR",
     "args": {
-      "gamma": 0.998
+      "gamma": 1
     }
   },
   "trainer": {
-    "epochs": 30,
+    "epochs": 100,
     "save_dir": "saved/",
     "save_period": 10,
     "verbosity": 2,

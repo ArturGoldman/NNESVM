@@ -24,7 +24,7 @@ def mala_step(prev_point, dist, gamma):
 
 
 class GenMCMC(nn.Module):
-    def __init__(self, dist, mcmc_type="ULA", gamma=0.1):
+    def __init__(self, dist, mcmc_type="ULA", prop_scale=1., gamma=0.1):
         super().__init__()
         # note, that grad log is passed, which is -nabla U (note the minus)
         self.dist = dist
@@ -34,6 +34,7 @@ class GenMCMC(nn.Module):
             "ULA": ula_step,
             "MALA": mala_step
         }
+        self.prop_scale = prop_scale
 
     def energy(self, z):
         z = z["points"]
@@ -57,7 +58,7 @@ class GenMCMC(nn.Module):
         if true_t < T:
             all_chains = []
             for i in range(T//true_t):
-                start_points = 5 * torch.randn((true_t, self.dist.dim))
+                start_points = self.prop_scale * torch.randn((true_t, self.dist.dim))
                 init_params = {"points": start_points}
                 mcmc = MCMC(kernel, num_samples=n_clean, warmup_steps=n_burn,
                             num_chains=true_t, initial_params=init_params, mp_context='spawn')
@@ -65,7 +66,7 @@ class GenMCMC(nn.Module):
                 chains = mcmc.get_samples(group_by_chain=True)
                 all_chains.append(chains["points"].squeeze())
 
-            start_points = 5 * torch.randn((T%true_t, self.dist.dim))
+            start_points = torch.randn((T%true_t, self.dist.dim))
             init_params = {"points": start_points}
             mcmc = MCMC(kernel, num_samples=n_clean, warmup_steps=n_burn,
                         num_chains=T%true_t, initial_params=init_params, mp_context='spawn')
@@ -74,7 +75,7 @@ class GenMCMC(nn.Module):
             all_chains.append(chains["points"].squeeze())
             return torch.cat(all_chains, dim=0)
         else:
-            start_points = 5 * torch.randn((T, self.dist.dim))
+            start_points = self.prop_scale * torch.randn((T, self.dist.dim))
             init_params = {"points": start_points}
             mcmc = MCMC(kernel, num_samples=n_clean, warmup_steps=n_burn,
                         num_chains=T, initial_params=init_params, mp_context='spawn')
@@ -96,7 +97,7 @@ class GenMCMC(nn.Module):
             return self.generate_chains_pyro(n_burn, n_clear, 1, rseed=rseed)
         if rseed is not None:
             torch.manual_seed(rseed)
-        prev_point = 5*torch.randn(self.dist.dim).reshape(1, -1)
+        prev_point = self.prop_scale * torch.randn(self.dist.dim).reshape(1, -1)
         samples = [prev_point]
         # start from 1, because we already have one starting point
         for i in tqdm(range(1, n_burn+n_clear), desc="Generating samples"):
