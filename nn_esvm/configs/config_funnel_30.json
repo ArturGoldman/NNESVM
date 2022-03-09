@@ -2,7 +2,7 @@
   "name": "funnel_30",
   "n_gpu": 1,
   "f(x)": {
-    "type": "sec_coord_square",
+    "type": "sec_coord",
     "args": {
     }
   },

@@ -16,6 +16,5 @@ class CollateSubSample(object):
         self.cnt += 1
         if self.cnt >= n_step:
             self.cnt = 0
-        #start_pos = random.randint(0, n_step-1)
         return torch.stack(batch[self.cnt::n_step], dim=0)
 

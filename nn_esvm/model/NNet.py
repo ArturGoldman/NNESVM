@@ -47,7 +47,6 @@ class MLP(nn.Module):
         if self.ped > 0:
             add = torch.repeat_interleave(x, self.ped, dim=1) * self.freqs[None, :]
             x = torch.cat([x, torch.sin(add), torch.cos(add)], dim=1)
-            # x = torch.cat([torch.sin(add), torch.cos(add)], dim=1)
         out = self.head(x)
         out = self.body(out)
         out = self.tail(out)

@@ -154,27 +154,6 @@ class Trainer(BaseTrainer):
         return func(chain)
 
     def calc_box(self, description, to_cv=False):
-        """
-        for T in tqdm(range(self.trial_num), desc=description):
-            batch = chains[T].to(self.device)
-            batch.requires_grad = True
-            if to_cv:
-                vnf = self.metric(self.function(chains[T]))
-                cvs = self.process_cv(batch, False, self.cv_type)
-                vnfcv = self.metric(self.function(batch) - cvs)
-                cur_box.append((self.function(batch)-cvs).mean().item())
-
-                vnfs.append(vnf.item())
-                vnfcvs.append(vnfcv.item())
-
-            else:
-                cur_box.append(self.function(batch).mean().item())
-
-        if len(vnfs) == 0:
-            return cur_box, None, None
-        return cur_box, sum(vnfs) / len(vnfs), sum(vnfcvs) / len(vnfcvs)
-        """
-
         if self.val_chains is None:
             print("~~~~~~", description, "~~~~~~")
             print("Parallel chain generation started")

@@ -1,14 +1,6 @@
-import math
 import torch
 import torch.nn as nn
 import torch.distributions as D
-
-
-"""
-Each distribution class must have:
-dim field: int, dimensionality of data
-grad_log function: function which computes gradient of log density
-"""
 
 
 class MyDistribution(nn.Module):
@@ -54,7 +46,7 @@ class BananaShape(MyDistribution):
         self.base_dist = D.MultivariateNormal(torch.zeros(dim), torch.diag(var))
 
     def potential(self, x):
-        return x[:, 0]**2/(2*self.p) + (x[:, 1] + self.b*x[:, 0]**2 - self.p*self.b)**2 + (x[:, 2:]**2/2).sum(dim=1)
+        return x[:, 0]**2/(2*self.p) + (x[:, 1] + self.b*x[:, 0]**2 - self.p*self.b)**2/2 + (x[:, 2:]**2/2).sum(dim=1)
 
     def sample(self, n):
         samples = self.base_dist.sample((n,))
@@ -62,11 +54,6 @@ class BananaShape(MyDistribution):
         return samples
 
     def log_prob(self, x: torch.Tensor):
-        """
-        y = x.clone()
-        y[:, 1] = y[:, 1] + self.b * y[:, 0] ** 2 - self.p * self.b
-        return self.base_dist.log_prob(y)
-        """
         return -(x[:, 0]**2/(2*self.p) + (x[:, 1] + self.b*x[:, 0]**2 - self.p*self.b)**2/2 + (x[:, 2:]**2/2).sum(-1))
 
     def grad_log(self, x: torch.Tensor):
@@ -103,22 +90,11 @@ class GMM(MyDistribution):
 class Funnel(MyDistribution):
     def __init__(self, dim, a=1, b=0.5):
         super().__init__(dim)
-        if self.dim % 2 != 0:
-            raise ValueError("Please, specify even number of dimensions for Funnel distribution")
         self.a = a
         self.b = b
 
     def log_prob(self, x):
         logprob1 = -x[:, 0]**2/(2*self.a)
-
-        """
-        logprob2 = (
-                -torch.exp(-2*self.b*x[:, 0]) *
-                (x[:, 1:]**2).sum(-1)
-                - math.log(self.dim)
-                + (2*self.b*x[:, 0])
-        )
-        """
 
         logprob2 = (
                 -torch.exp(-2*self.b*x[:, 0]) *
