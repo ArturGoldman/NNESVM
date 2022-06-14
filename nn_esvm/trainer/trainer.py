@@ -41,7 +41,12 @@ class Trainer(BaseTrainer):
 
         self.criterion = config.init_obj(config["loss_spec"], nn_esvm.loss)
         self.metric = config.init_obj(config["metric"], nn_esvm.loss)
-        self.function = config.init_ftn("f(x)", nn_esvm.functions_to_E)
+
+        if "char" in config["f(x)"]:
+            if config["f(x)"]["char"] == "obj":
+                self.function = config.init_obj(config["f(x)"], nn_esvm.functions_to_E)
+        else:
+            self.function = config.init_ftn("f(x)", nn_esvm.functions_to_E)
         self.target_distribution = config.init_obj(config["data"]["target_dist"],
                                                    nn_esvm.distributions)
         self.data_loader = get_dataloader(config, self.target_distribution, "train", self.writer)
@@ -134,7 +139,7 @@ class Trainer(BaseTrainer):
         return log
 
     def process_batch(self, batch: torch.Tensor, metrics: MetricTracker):
-        batch = batch.to(self.device)
+        batch = batch.to(self.device) # moving batch to device but not offloading it. might be memory overflow
         self.optimizer.zero_grad()
         outputs = process_cv(self.model, batch, self.device, self.out_model_dim,
                              self.target_distribution.dim, self.target_distribution.grad_log,

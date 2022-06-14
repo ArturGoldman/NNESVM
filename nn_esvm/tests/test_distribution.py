@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-from nn_esvm.distributions.distributions import BananaShape, GMM, Funnel
+from nn_esvm.distributions.distributions import BananaShape, GMM, Funnel, LogReg
 import matplotlib.pyplot as plt
 from nn_esvm.MCMC import GenMCMC
 
@@ -126,9 +126,12 @@ def run_tests(dist, n_burn=1000, n_clean=1000, mc_type="ULA", gamma=0.1, step=10
 
 
 if __name__ == "__main__":
-    dist = Funnel(2)
+    #dist = LogReg(15, "../../saved/eyes.csv", 10)
+    dist = Funnel(2, a=1, b=0.5)
+    plot_samples(dist, 10**4)
+    #dist = Funnel(30, a=1, b=0.5)
     #dist = BananaShape(2, p=100)
     #dist = GMM(2, 1)
     #run_tests(dist, 10**5, 10**6, "MALA", 0.1, 1)
-    see_chains('../../saved/data/Funnel_10_NUTS_926.pth', dist)
+    #see_chains('../../saved/data/Funnel_30_NUTS_926.pth', dist)
 

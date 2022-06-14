@@ -48,6 +48,7 @@ class LossESVM(nn.Module):
             batch = batch - cvbatch
 
         avg = batch.mean(dim=0)
+        #avg = fbatch.mean(dim=0)
 
         n = batch.size(0)
         loss = ((batch-avg)**2).sum() / n
@@ -73,6 +74,7 @@ class SmartLossESVM(LossESVM):
         batch = fbatch-cvbatch
 
         avg = batch.mean(dim=0)
+        #avg = fbatch.mean(dim=0)
 
         n = batch.size(0)
         loss_accum = 0

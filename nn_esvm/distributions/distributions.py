@@ -1,6 +1,9 @@
 import torch
 import torch.nn as nn
 import torch.distributions as D
+import pandas as pd
+import random
+import nn_esvm.utils.matrix_op as matop
 
 
 class MyDistribution(nn.Module):
@@ -104,8 +107,64 @@ class Funnel(MyDistribution):
 
         return logprob1 + logprob2
 
+    def grad_log(self, x):
+        y = x.clone()
+        y[:, 0] = y[:, 0]/self.a + (self.dim-1)*self.b - \
+                  2*self.b*torch.exp(-2 * self.b * y[:, 0])*(y[:, 1:] ** 2 / 2).sum(-1)
+        y[:, 1:] *= torch.exp(-2 * self.b * x[:, 0])[:, None]
+        return -y
+
     def sample(self, n):
         all_c = torch.randn((n, self.dim))
         all_c[:, 0] = all_c[:, 0] * self.a**0.5
         all_c[:, 1:] = all_c[:, 1:]*(torch.exp(self.b*all_c[:, 0]))[:, None]
         return all_c
+
+
+class LogReg(MyDistribution):
+    def __init__(self, dim, path_to_dset, scale, sample_sz=None, train_ratio=0.8, intercept=True,
+                 stand_type="full", rseed=926):
+        super().__init__(dim)
+        self.dset = pd.read_csv(path_to_dset)
+        self.dset_sz = self.dset.shape[0]
+        self.scale = scale # sigma
+
+        self.inds = list(range(self.dset_sz))
+        random.seed(rseed)
+        random.shuffle(self.inds)
+        if sample_sz is not None:
+            self.inds = self.inds[:sample_sz]
+        self.tr_inds = self.inds[:int(train_ratio*len(self.inds))]
+        self.test_inds = self.inds[int(train_ratio*len(self.inds)):]
+        self.dset = self.dset.to_numpy()
+
+        self.X = self.dset[self.tr_inds, :-1]
+        if stand_type == "full":
+            self.X, _ = matop.standartize(self.X, None, intercept)
+        elif stand_type == "poor":
+            self.X, _ = matop.poor_standartize(self.X, None, intercept)
+        else:
+            raise RuntimeError('Passed standartization was not recognised')
+        self.Y = torch.from_numpy(self.dset[self.tr_inds, -1:]).float()
+
+    def log_prob(self, x: torch.Tensor):
+        """
+        Calculates log density up to additive constant
+        :param x: [n_batch, dimension]
+        :return: log_prob [n_batch, ]
+        """
+        scal_prod = self.X @ x.transpose(0, 1)
+        first_part = (self.Y*scal_prod + nn.functional.logsigmoid(-scal_prod)).sum(dim=0)
+        sec_part = (x**2).sum(dim=1)/(2*self.scale**2)
+        return first_part - sec_part
+
+    def grad_log(self, x: torch.Tensor):
+        """
+        Calculates gradient of log density for given points
+        Expects log_prob function to be working in differentiable manner
+        :param x: [n_batch, dimension]
+        :return: gradients [n_batch, dimension]
+        """
+        first_part = (self.Y * self.X).sum(dim=0) - torch.special.expit(x @ self.X.transpose(0, 1))@self.X
+        sec_part = x/(self.scale**2)
+        return first_part - sec_part
