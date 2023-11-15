@@ -40,7 +40,7 @@ chmod u+x ./experiments.sh
 ## Specifics
 
 - Testing procedure is implemented in parallel manner
-- It was decided to use neural network to model function <img src="https://render.githubusercontent.com/render/math?math=\varphi">. 
+- It was decided to use neural network to model function $\varphi$. 
 Thus we had to calculate $\Delta\varphi$ in a differentiable manner.
 Still, implementation allows one to experiment with various types of CV.
 - Backprop through Empirical Spectral Variance was implemented in memory-efficient manner
