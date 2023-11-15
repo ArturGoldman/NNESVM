@@ -124,6 +124,18 @@ class Funnel(MyDistribution):
 class LogReg(MyDistribution):
     def __init__(self, dim, path_to_dset, scale, sample_sz=None, train_ratio=0.8, intercept=True,
                  stand_type="full", rseed=926):
+        """
+        Based on LogReg experiment from https://arxiv.org/abs/1910.03643
+
+        :param dim: dimension of your distribution
+        :param path_to_dset: path to dataset where all points are stored
+        :param scale: sigma in normal prior on weights
+        :param sample_sz: subsample size to construct distribution on. large datasets might lead to heavy computation
+        :param train_ratio: ratio of training set w.r.t. number of points in dataset
+        :param intercept: true: add intercept term during standartization of dataset. NOTE: when this field is true, one should add 1 to dim field. false: does nothing
+        :param stand_type: standartisation of dataset. available options: full, poor
+        :param rseed: random seed for randomness in distribution definition
+        """
         super().__init__(dim)
         self.dset = pd.read_csv(path_to_dset)
         self.dset_sz = self.dset.shape[0]

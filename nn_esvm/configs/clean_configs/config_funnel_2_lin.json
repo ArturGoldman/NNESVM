@@ -1,28 +1,25 @@
 {
-  "name": "funnel_30",
+  "name": "funnel_2_lin",
   "n_gpu": 1,
   "f(x)": {
-    "type": "sec_coord",
+    "type": "sec_coord_square",
     "args": {
     }
   },
-  "cv_type": "stein",
+  "cv_type": "stein_classic",
   "arch": {
-    "type": "MLP",
+    "type": "DummyLinear",
     "args": {
-      "dim": 30,
-      "out_dim": 30,
-      "pos_encoding_dim": 0,
-      "hidden": 50,
-      "blocks": 3,
-      "activation": "LeakyReLU"
+      "dim": 2,
+      "poly_deg": 4,
+      "out_dim": 1
     }
   },
   "data": {
     "target_dist": {
       "type": "Funnel",
       "args": {
-        "dim": 30,
+        "dim": 2,
         "a": 1,
         "b": 0.5
       }
@@ -33,7 +30,7 @@
       "collate_fn": {
         "type": "CollateSubSample",
         "args": {
-          "subsample_sz": 6000
+          "subsample_sz": 10000
         }
       },
       "shuffle": false,
@@ -42,7 +39,7 @@
           "type": "FolderDataset",
           "args": {
             "n_step": 1,
-            "folder_name": "saved/data/Funnel_30_NUTS_926.pth"
+            "folder_name": "saved/data/Funnel_2_NUTS_926.pth"
           }
         }
       ]
@@ -50,7 +47,7 @@
     "val": {
       "shuffle": false,
       "Trials": 30,
-      "folder_name": "saved/data/Funnel_30_NUTS_926.pth",
+      "folder_name": "saved/data/Funnel_2_NUTS_926.pth",
       "datasets": [
         {
           "type": "DistributionDataset",
@@ -60,7 +57,7 @@
             "prop_scale": 1,
             "n_burn": 10000,
             "n_clean": 30000,
-            "n_step": 3,
+            "n_step": 1,
             "rseed": 926
           }
         }
@@ -77,7 +74,7 @@
     "type": "SmartLossESVM",
     "args": {
       "lag_func": "triangular",
-      "bn": 10,
+      "bn": 30,
       "reg_lambda": 0
     }
   },
@@ -85,27 +82,26 @@
     "type": "LossESVM",
     "args": {
       "lag_func": "triangular",
-      "bn": 10,
+      "bn": 30,
       "reg_lambda": 0
     }
   },
   "lr_scheduler": {
     "type": "ExponentialLR",
     "args": {
-      "gamma": 1
+      "gamma": 0.999
     }
   },
   "trainer": {
-    "epochs": 100,
+    "epochs": 200,
     "save_dir": "saved/",
     "save_period": 10,
     "verbosity": 2,
     "monitor": "min loss_esv",
     "early_stop": 30,
     "visualize": "wandb",
-    "wandb_project": "NeuralESVM-HSE-HDI",
+    "wandb_project": "NeuralESVM-HSE-HDI-V3",
     "log_step": 5,
-    "val_step": 5,
-    "grad_norm_clip": 200
+    "val_step": 5
   }
 }

@@ -39,7 +39,7 @@ def main(config):
     save_name.mkdir(parents=True, exist_ok=True)
     save_name = save_name/sec_part
     torch.save(state, save_name)
-    logger.info("Chains were generated in {} hours, {} minutes, {} seconds".format(tot//3600, tot//60, tot%60))
+    logger.info("Chains were generated in {} hours, {} minutes, {} seconds".format(tot//3600, (tot%3600)//60, tot%60))
     logger.info("Data saved to: {}".format(str(save_name)))
 
     if config["to_check"]:

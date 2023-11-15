@@ -6,6 +6,15 @@ def process_cv(model, batch, operating_device,
                out_model_dim, target_dist_dim,
                grad_log,
                cr_gr=False, mode="simple_additive", to_detach=False):
+    """
+    :param grad_log: function of gradient of density logarithm
+    :param mode:
+    "simple_additive" - neural network parametrises the whole cv. simple, but not necessarily unbiased cv
+    "stein" - neural network paramtrises gradient of \varphi in stein cv. allows to escape one differentiation
+    "stein_classic" - neural network parametrises function \varphi in stein cv. requires evaluating trace of hessian for neural network in differentiable manner,
+    which leads to differentiating over neural network 3 times overall.
+    :return:
+    """
     if mode == "simple_additive":
         if out_model_dim != 1:
             # model output dim should be 1 to be subtracted from f
@@ -37,7 +46,6 @@ def process_cv(model, batch, operating_device,
         return (torch.stack(laplacians) + (log_grads*outs).sum(dim=1)).reshape(-1, 1)
     elif mode == "stein_classic":
         # here we interpret model as varphi
-        # WARNING: CURRENTLY UNDER CONSTRUCTION
         if out_model_dim != 1:
             # model output dim should be 1 for defined implementation
             raise ValueError("Model output dimension is not 1. It should be while using stein_classic CV")

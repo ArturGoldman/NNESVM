@@ -1,9 +1,11 @@
 numpy
 tqdm
 tensorboard
-matplotlib
+matplotlib==3.3.2
 plotly
-pyro
+pyro-ppl==1.8.0
 
 pandas
 wandb
+protobuf==3.20.*
+setuptools==59.5.0

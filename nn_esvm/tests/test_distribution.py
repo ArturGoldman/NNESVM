@@ -102,12 +102,20 @@ def check_bias(cur, n_burn=1000, n_clean=1000, mc_type="ULA", gamma=0.1, step=10
     plt.grid()
     plt.show()
 
-def see_chains(file_name, cur):
+
+def see_mean(file_name):
+    checkpoint = torch.load(file_name)
+    chains = checkpoint["chains"]
+    print(chains[0, :, 1].mean())
+    print((chains[0, :, 1]**2).mean())
+
+
+def see_chains(file_name, cur, n_step=1):
     checkpoint = torch.load(file_name)
     chains = checkpoint["chains"]
     print(chains.size())
     for i in range(chains.size(0)):
-        samples = chains[i]
+        samples = chains[i, ::n_step]
         plt.figure(figsize=(12, 8))
         plt.scatter(samples[:, 0], samples[:, 1], c=cur.log_prob(samples))
         plt.grid()
@@ -127,11 +135,17 @@ def run_tests(dist, n_burn=1000, n_clean=1000, mc_type="ULA", gamma=0.1, step=10
 
 if __name__ == "__main__":
     #dist = LogReg(15, "../../saved/eyes.csv", 10)
-    dist = Funnel(2, a=1, b=0.5)
-    plot_samples(dist, 10**4)
+    #dist = Funnel(2, a=1, b=0.5)
+    #plot_samples(dist, 10**4)
     #dist = Funnel(30, a=1, b=0.5)
-    #dist = BananaShape(2, p=100)
+    dist = BananaShape(6, p=20, b=0.1) # E[Z_2] = 1 + 2*(bp)**2
+    plot_samples(dist, 10**4)
+    samps = dist.sample(10000)
+    print(samps[:, 1].mean())
+    print(((samps[:, 1])**2).mean())
     #dist = GMM(2, 1)
     #run_tests(dist, 10**5, 10**6, "MALA", 0.1, 1)
     #see_chains('../../saved/data/Funnel_30_NUTS_926.pth', dist)
+    #see_chains('../../saved/data/BananaShape_8_ULA_926.pth', dist, n_step=100)
+    see_mean('../../saved/data/BananaShape_6_ULA_926.pth')
 

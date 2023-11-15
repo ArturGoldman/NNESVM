@@ -1,5 +1,5 @@
 {
-  "name": "funnel_20",
+  "name": "funnel_2_requ",
   "n_gpu": 1,
   "f(x)": {
     "type": "sec_coord_square",
@@ -10,11 +10,11 @@
   "arch": {
     "type": "MLP",
     "args": {
-      "dim": 20,
+      "dim": 2,
       "out_dim": 1,
       "pos_encoding_dim": 0,
-      "hidden": 10,
-      "blocks": 3,
+      "hidden": 30,
+      "blocks": 2,
       "activation": "ReQU"
     }
   },
@@ -22,7 +22,7 @@
     "target_dist": {
       "type": "Funnel",
       "args": {
-        "dim": 20,
+        "dim": 2,
         "a": 1,
         "b": 0.5
       }
@@ -42,7 +42,7 @@
           "type": "FolderDataset",
           "args": {
             "n_step": 1,
-            "folder_name": "saved/data/Funnel_20_NUTS_926.pth"
+            "folder_name": "saved/data/Funnel_2_NUTS_926.pth"
           }
         }
       ]
@@ -50,7 +50,7 @@
     "val": {
       "shuffle": false,
       "Trials": 30,
-      "folder_name": "saved/data/Funnel_20_NUTS_926.pth",
+      "folder_name": "saved/data/Funnel_2_NUTS_926.pth",
       "datasets": [
         {
           "type": "DistributionDataset",
@@ -68,26 +68,24 @@
     }
   },
   "optimizer": {
-    "type": "SGD",
+    "type": "Adam",
     "args": {
-      "lr": 1e-2,
-      "momentum": 0.7,
-      "weight_decay": 0.3
+      "lr": 1e-2
     }
   },
   "loss_spec": {
     "type": "SmartLossESVM",
     "args": {
-      "lag_func": "linear",
-      "bn": 15,
+      "lag_func": "triangular",
+      "bn": 30,
       "reg_lambda": 0
     }
   },
   "metric": {
     "type": "LossESVM",
     "args": {
-      "lag_func": "linear",
-      "bn": 15,
+      "lag_func": "triangular",
+      "bn": 30,
       "reg_lambda": 0
     }
   },
@@ -98,14 +96,14 @@
     }
   },
   "trainer": {
-    "epochs": 50,
+    "epochs": 200,
     "save_dir": "saved/",
     "save_period": 10,
     "verbosity": 2,
     "monitor": "min loss_esv",
     "early_stop": 30,
     "visualize": "wandb",
-    "wandb_project": "NeuralESVM-HSE-HDI-V2",
+    "wandb_project": "NeuralESVM-HSE-HDI-V3",
     "log_step": 5,
     "val_step": 5,
     "grad_norm_clip": 200

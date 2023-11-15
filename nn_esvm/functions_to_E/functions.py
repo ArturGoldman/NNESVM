@@ -12,6 +12,10 @@ def cubic(x: Tensor):
     return (x**3).sum(dim=1, keepdim=True)
 
 
+def quadratic(x: Tensor):
+    return (x**2).sum(dim=1, keepdim=True)
+
+
 def sec_coord(x: Tensor):
     return x[:, 1].reshape(-1, 1)
 
@@ -22,6 +26,9 @@ def sec_coord_square(x: Tensor):
 
 class AvgLikelihood(object):
     def __init__(self, path_to_dset, train_ratio, intercept=True, sample_sz=None, stand_type="full", rseed=926):
+        """
+        Parameters should be put exactly as in LogReg distribution this function is used for
+        """
         self.dset = pd.read_csv(path_to_dset)
         self.dset_sz = self.dset.shape[0]
 

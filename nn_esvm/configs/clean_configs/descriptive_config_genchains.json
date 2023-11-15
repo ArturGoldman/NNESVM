@@ -1,0 +1,36 @@
+{
+  "name": [name of your run],
+  "n_gpu": [number of gpus available and used for running, example: 1],
+  "to_check": [true: prints the dimensions of tensor of generated chains after generation. false: does nothing],
+  "target_dist": {
+    [here you enter name of distribution and its parameters]
+    "type": [available: Funnel, BananaShape, GMM, LogReg],
+    "args": {
+        [here you enter parameters of distribution]
+    }
+  },
+  "chain_details": {
+            [here you enter parameters for Markov Chain generation method]
+    "mcmc_type": [method name. available: NUTS, ULA, MALA, HMC],
+    "prop_scale": [sigma for initial point generation: x_0 ~ sigma * N(0, I)],
+    "n_burn": [number of points in burn-in period],
+    "n_clean": [number of points in the main chain part],
+    "n_chains": [number of chains to generate],
+    "rseed": [random seed for randomness in chain generation]
+    [....] : [other fields with parameters of chain generation method, see code to know which are required]
+  },
+  "trainer": {
+          [necessary field, do not delete]
+    "epochs": [any],
+    "save_dir": [directory to save your chain],
+    "save_period": [any],
+    "verbosity": 2,
+    "monitor": [any],
+    "early_stop": [any],
+    "visualize": "tensorboard",
+    "wandb_project": [if wandb visualize method set, enter your project name],
+    "log_step": [any],
+    "val_step": [any],
+    "grad_norm_clip": [any]
+  }
+}

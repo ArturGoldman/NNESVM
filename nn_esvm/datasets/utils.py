@@ -51,6 +51,8 @@ def get_dataloader(configs: ConfigParser, target_dist, split, writer):
         raise Exception()
 
     # create dataloader
+    # here batch size = length of the whole chain, the collator takes care of taking the correct subsample
+
     dataloader = DataLoader(
         dataset, batch_size=bs,
         shuffle=shuffle, num_workers=num_workers,

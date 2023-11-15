@@ -1,24 +1,17 @@
 #!/bin/bash
 
-#python3 ./train.py -c ./nn_esvm/configs/config_funnel_2_lin.json
-#python3 ./train.py -c ./nn_esvm/configs/config_funnel_2.json
+# Funnel distribution experiments
+python ./generate_samples.py -c ./nn_esvm/configs/clean_configs/config_genchains_funnel_2.json
+python ./train.py -c ./nn_esvm/configs/clean_configs/config_funnel_2_recu.json
+python ./train.py -c ./nn_esvm/configs/clean_configs/config_funnel_2_lin.json
+python ./train.py -c ./nn_esvm/configs/clean_configs/config_funnel_2_relu.json
+python ./train.py -c ./nn_esvm/configs/clean_configs/config_funnel_2_requ.json
 
-#python3 ./train.py -c ./nn_esvm/configs/config_funnel_10.json
-#python3 ./train.py -c ./nn_esvm/configs/config_funnel_20.json
-#python3 ./train.py -c ./nn_esvm/configs/config_funnel_20_t2.json
-#python3 ./train.py -c ./nn_esvm/configs/config_funnel_30.json
-#python3 ./train.py -c ./nn_esvm/configs/config_funnel_40.json
+# Banana distribution experiment
+python ./generate_samples.py -c ./nn_esvm/configs/clean_configs/config_genchains_banana_6.json
+python ./train.py -c ./nn_esvm/configs/clean_configs/config_banana_6_recu.json
 
-#python3 ./train.py -c ./nn_esvm/configs/config_funnel_10_lin.json
-#python3 ./train.py -c ./nn_esvm/configs/config_funnel_10.json
-#python3 ./train.py -c ./nn_esvm/configs/config_pima4.json
-#python3 ./train.py -c ./nn_esvm/configs/config_funnel_2_t2.json
-#python3 ./train.py -c ./nn_esvm/configs/config_funnel_20_t2.json
-#python3 ./train.py -c ./nn_esvm/configs/config_pima4.json
-#python3 ./train.py -c ./nn_esvm/configs/config_funnel_20_t3.json
-#python3 ./train.py -c ./nn_esvm/configs/config_funnel_20_t3.json
-#python3 ./train.py -c ./nn_esvm/configs/config_funnel_20_t2.json
-#python3 ./train.py -c ./nn_esvm/configs/config_funnel_20_t3.json
-#python3 ./train.py -c ./nn_esvm/configs/config_funnel_20_t4.json
-#python3 ./train.py -c ./nn_esvm/configs/config_pima4.json
-python3 ./train.py -c ./nn_esvm/configs/config_funnel_20_t5.json
+
+# Pima dataset logistic regression experiment
+python ./generate_samples.py -c ./nn_esvm/configs/clean_configs/config_genchains_pima.json
+python ./train.py -c ./nn_esvm/configs/clean_configs/config_pima_tanh.json

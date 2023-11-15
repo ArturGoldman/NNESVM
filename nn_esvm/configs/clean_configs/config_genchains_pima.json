@@ -1,19 +1,23 @@
 {
-  "name": "funnelgen",
+  "name": "pimagen",
   "n_gpu": 1,
   "to_check": false,
   "target_dist": {
-    "type": "Funnel",
+    "type": "LogReg",
     "args": {
-      "dim": 20,
-      "a": 1,
-      "b": 0.5
+      "dim": 9,
+      "path_to_dset": "saved/diabetes.csv",
+      "scale": 10,
+      "train_ratio": 0.8,
+      "sample_sz": 5000,
+      "intercept": true,
+      "stand_type": "full",
+      "rseed": 926
     }
   },
   "chain_details": {
-    "mcmc_type": "NUTS",
+    "mcmc_type": "ULA",
     "gamma": 0.1,
-    "prop_scale": 1,
     "n_burn": 10000,
     "n_clean": 30000,
     "n_chains": 31,
@@ -27,7 +31,7 @@
     "monitor": "min loss_esv",
     "early_stop": 30,
     "visualize": "tensorboard",
-    "wandb_project": "NeuralESVM-HSE-HDI",
+    "wandb_project": "NeuralESVM-HSE-HDI-V3",
     "log_step": 5,
     "val_step": 5,
     "grad_norm_clip": 200

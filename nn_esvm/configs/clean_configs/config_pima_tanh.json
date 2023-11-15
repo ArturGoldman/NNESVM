@@ -1,30 +1,40 @@
 {
-  "name": "funnel_40",
+  "name": "pima",
   "n_gpu": 1,
   "f(x)": {
-    "type": "sec_coord",
+    "type": "AvgLikelihood",
+    "char": "obj",
     "args": {
+      "path_to_dset": "saved/diabetes.csv",
+      "train_ratio": 0.8,
+      "intercept": true,
+      "stand_type": "full",
+      "rseed": 926
     }
   },
-  "cv_type": "stein",
+  "cv_type": "stein_classic",
   "arch": {
     "type": "MLP",
     "args": {
-      "dim": 40,
-      "out_dim": 40,
+      "dim": 9,
+      "out_dim": 1,
       "pos_encoding_dim": 0,
-      "hidden": 50,
-      "blocks": 3,
-      "activation": "LeakyReLU"
+      "hidden": 30,
+      "blocks": 2,
+      "activation": "Tanh"
     }
   },
   "data": {
     "target_dist": {
-      "type": "Funnel",
+      "type": "LogReg",
       "args": {
-        "dim": 40,
-        "a": 1,
-        "b": 0.5
+        "dim": 9,
+        "path_to_dset": "saved/diabetes.csv",
+        "scale": 10,
+        "train_ratio": 0.8,
+        "intercept": true,
+        "stand_type": "full",
+        "rseed": 926
       }
     },
     "train": {
@@ -33,7 +43,7 @@
       "collate_fn": {
         "type": "CollateSubSample",
         "args": {
-          "subsample_sz": 6000
+          "subsample_sz": 10000
         }
       },
       "shuffle": false,
@@ -42,7 +52,7 @@
           "type": "FolderDataset",
           "args": {
             "n_step": 1,
-            "folder_name": "saved/data/Funnel_40_NUTS_926.pth"
+            "folder_name": "saved/data/LogReg_9_ULA_926.pth"
           }
         }
       ]
@@ -50,17 +60,16 @@
     "val": {
       "shuffle": false,
       "Trials": 30,
-      "folder_name": "saved/data/Funnel_40_NUTS_926.pth",
+      "folder_name": "saved/data/LogReg_9_ULA_926.pth",
       "datasets": [
         {
           "type": "DistributionDataset",
           "args": {
-            "mcmc_type": "NUTS",
+            "mcmc_type": "ULA",
             "gamma": 0.1,
-            "prop_scale": 1,
             "n_burn": 10000,
-            "n_clean": 30000,
-            "n_step": 3,
+            "n_clean": 10000,
+            "n_step": 1,
             "rseed": 926
           }
         }
@@ -77,7 +86,7 @@
     "type": "SmartLossESVM",
     "args": {
       "lag_func": "triangular",
-      "bn": 10,
+      "bn": 15,
       "reg_lambda": 0
     }
   },
@@ -85,27 +94,26 @@
     "type": "LossESVM",
     "args": {
       "lag_func": "triangular",
-      "bn": 10,
+      "bn": 15,
       "reg_lambda": 0
     }
   },
   "lr_scheduler": {
     "type": "ExponentialLR",
     "args": {
-      "gamma": 1
+      "gamma": 0.999
     }
   },
   "trainer": {
-    "epochs": 100,
+    "epochs": 200,
     "save_dir": "saved/",
     "save_period": 10,
     "verbosity": 2,
     "monitor": "min loss_esv",
     "early_stop": 30,
     "visualize": "wandb",
-    "wandb_project": "NeuralESVM-HSE-HDI",
+    "wandb_project": "NeuralESVM-HSE-HDI-V3",
     "log_step": 5,
-    "val_step": 5,
-    "grad_norm_clip": 200
+    "val_step": 5
   }
 }

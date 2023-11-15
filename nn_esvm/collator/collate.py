@@ -9,6 +9,8 @@ class CollateSubSample(object):
 
     def __call__(self, batch):
         """
+        you sequentially get every n_step sample starting from self.cnt
+        after several calls you get all subsamples and you start over
         :param batch: List[torch.tensor]
         :return: modified batch
         """

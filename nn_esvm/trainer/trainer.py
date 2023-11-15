@@ -79,6 +79,9 @@ class Trainer(BaseTrainer):
             chains = checkpoint["chains"]
             chains = chains[:, ::self.val_desc["n_step"], :]
             self.val_chains = chains[1:]
+            if self.config["data"]["val"].get("remove_train_bias", None) is not None:
+                if self.config["data"]["val"]["remove_train_bias"]:
+                    model.update_mean_diff(chains[0].to(device).mean(dim=0))
 
         self.val_generator = GenMCMC(self.target_distribution,
                                      self.val_desc["mcmc_type"], self.val_desc["gamma"])

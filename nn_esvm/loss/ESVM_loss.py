@@ -26,6 +26,11 @@ class LossESVM(nn.Module):
         return 0.5+0.5*math.cos(math.pi*abs(s))
 
     def __init__(self, lag_func="linear", bn=50, reg_lambda=0.):
+        """
+        :param lag_func: type of lag function to use
+        :param bn: bn parameter
+        :param reg_lambda: lambda parameter used for regulariser part. currently not used
+        """
         super().__init__()
         if lag_func == "linear":
             self.lagf = self.linear_w
@@ -40,6 +45,7 @@ class LossESVM(nn.Module):
 
     def __call__(self, fbatch: Tensor, cvbatch: Tensor):
         """
+        Regular loss function (Empirical Spectral Variance). Can be used for metric tracking
         batch: [n_batch, dim]. Expected to receive points h(X) already
         :return: Empirical Spectral Variance, tensor
         """
@@ -67,6 +73,7 @@ class SmartLossESVM(LossESVM):
 
     def __call__(self, fbatch: Tensor, cvbatch: Tensor):
         """
+        "Smarter" loss function. Propagates term by term in order not to store large computation graph in memory
         batch: [n_batch, dim]. Expected to receive points h(X) already
         :return: Empirical Spectral Variance, tensor(!!!)
         """

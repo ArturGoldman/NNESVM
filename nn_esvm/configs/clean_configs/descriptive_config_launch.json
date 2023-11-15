@@ -1,0 +1,108 @@
+{
+  "name": [name of your run. it will be used to name a folder where all logs and checkpoints are stored],
+  "n_gpu": [number of gpus available and used for experiment launch. example: 1],
+  "f(x)": {
+    "type": [name of function, expected value of which we estimate. for available functions see file nn_esvm/functions_to_E/functions.py],
+    "char": [if function has arguments (e.g. we will create object which will work on call), one should put "obj" here. otherwise this field should be deleted],
+    "args": {
+      [here one should type parameters for function of integration]
+    }
+  },
+  "cv_type": [control variate type. available options: simple_additive, stein, stein_classic],
+  "arch": {
+        [description of model used]
+    "type": [name of model. available options: DummyLinear, MLP],
+    "args": {
+        [parameters of model used]
+        [here one should be careful with dimension of input data, which must coincide with target distribution dimensionality,
+        and output dimension, which is also different, based on choice of "cv_type"]
+    }
+  },
+  "data": {
+    "target_dist": {
+            [description of target distribution. should be exactly the same as in chain generation file (if one was used)]
+      "type": [name],
+      "args": {
+        [dist args]
+      }
+    },
+    "train": {
+      "batch_size": [NOTE. here one should put the exact size of training chain. thus one should have idea of training chain after the choice of dataset type and arguments in it],
+      "num_workers": [number of workers for pytorch dataloader],
+      "collate_fn": {
+              [see collator function on what it does]
+        "type": "CollateSubSample",
+        "args": {
+          "subsample_sz": [number of subsample for one epoch]
+        }
+      },
+      "shuffle": [whether to shuffle chain. obviously, it should be set to false . it was introduced only for experimental purposes],
+      "datasets": [
+        {
+                [type and arguments of dataset]
+                [see nn_esvm/datasets/Datasets.py for available datasets and their arguments]
+          "type": [name of dataset],
+          "args": {
+            [arguments for dataset]
+          }
+        }
+      ]
+    },
+    "val": {
+      "shuffle": [whether to shuffle chain. obviously, it should be set to false . it was introduced only for experimental purposes],
+      "Trials": [number of val chains],
+      "folder_name": [folder of saved generated chains, if they were generated in advance],
+      "remove_train_bias": [if training model is MLP, and this field is set to true , empiricl mean of training chain will be subtracted
+                            from points, put in forward through the net. allows to reduce training instability],
+      "datasets": [
+      {
+              [type of dataset used for validation chains]
+        "type": [type of dataset],
+        "args": {
+                [args of dataset]
+          }
+        }
+      ]
+    }
+  },
+  "optimizer": {
+            [here all information about optimiser is put. any optimiser from pytorch can be used]
+    "type": [name of optimiser],
+    "args": {
+        [arguments of optimiser]
+    }
+  },
+  "loss_spec": {
+    "type": [type of loss function used to backpropagate through]
+    "args": {
+            [arguments of loss function]
+    }
+  },
+  "metric": {
+    "type": [type of loss used for metric tracking],
+    "args": {
+            [arguments of metric function]
+    }
+  },
+  "lr_scheduler": {
+        [here all information about learning rate scheduler is put. any learning rate scheduler from pytorch can be used]
+    "type": [name of lr scheduler],
+    "args": {
+        [arguments of lr scheduler]
+    }
+  },
+  "trainer": {
+    "epochs": [number of training epochs. specifically, number of subsamples from collator function to backpropagate through],
+    "save_dir": [directory name to save checkpoints and logs of the run],
+    "save_period": [number of epochs after which program makes a checkpoint of model and optimisation state. example: 10],
+    "verbosity": [verbosity parameter for logger. example: 2],
+    "monitor": [name and type of metric to track. if this metric does not get better in "early_stop" steps, program shuts down automatically.
+                available modes: ["min", "max"]. example: "min loss_esv"],
+    "early_stop": [max number of epochs program works while metric in "monitor" does not improve in the way stated there. after this amount of steps program shuts down.],
+    "visualize": [visualiser type. available options: tensorboard, wandb. for wandb option do not forget to login though terminal],
+    "wandb_project": [if visualisation is set to be wandb, mention name of your wandb project],
+    "log_step": [number of epochs after which logger should update all metrics from code],
+    "val_step": [number of epochs after which program does validation (test) step],
+    "grad_norm_clip": [if specified, gradient of model is clipped to the specified value before backward. example: 200]
+  }
+}
