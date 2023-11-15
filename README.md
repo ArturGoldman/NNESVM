@@ -1,6 +1,6 @@
 # NNESVM
 Neural Netowrks as Control Variates in ESVM algorithm
-
+This is a branch with an old version of the algorithm and code.
 
 ## Running guide
 
