@@ -7,7 +7,7 @@ Neural Networks as Control Variates in ESVM algorithm
 To set up environment first run
 ```
 git clone https://github.com/ArturGoldman/NNESVM
-cd NNESVM
+cd ./NNESVM
 chmod u+x ./prep.sh
 ./prep.sh
 ```
