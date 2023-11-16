@@ -47,7 +47,7 @@ Still, implementation allows one to experiment with various types of CV.
 
 
 ## Results
-1 layered Fully connected neural network with ReCU/Tanh activation was able to achieve acceptable variance reduction rate.
+Fully connected neural network with ReCU/Tanh activation and 1 hidden layer was able to achieve acceptable variance reduction rate.
 
 Details of training and experimenting can be found here: https://wandb.ai/artgoldman/NeuralESVM-HSE-HDI-V3
 
