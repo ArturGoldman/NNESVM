@@ -64,7 +64,10 @@ class GenMCMC(nn.Module):
                             num_chains=true_t, initial_params=init_params, mp_context='spawn')
                 mcmc.run()
                 chains = mcmc.get_samples(group_by_chain=True)
-                all_chains.append(chains["points"].squeeze())
+                if true_t > 1:
+                    all_chains.append(chains["points"].squeeze())
+                else:
+                    all_chains.append(chains["points"].squeeze(2))
 
             start_points = torch.randn((T%true_t, self.dist.dim))
             init_params = {"points": start_points}
@@ -72,7 +75,10 @@ class GenMCMC(nn.Module):
                         num_chains=T%true_t, initial_params=init_params, mp_context='spawn')
             mcmc.run()
             chains = mcmc.get_samples(group_by_chain=True)
-            all_chains.append(chains["points"].squeeze())
+            if T%true_t > 1:
+                all_chains.append(chains["points"].squeeze())
+            else:
+                all_chains.append(chains["points"].squeeze(2))
             return torch.cat(all_chains, dim=0)
         else:
             start_points = self.prop_scale * torch.randn((T, self.dist.dim))
